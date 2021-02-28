@@ -1,0 +1,127 @@
+<html>
+  <head>
+    <link rel="stylesheet"
+      href="vendor/default.min.css">
+    <script src="vendor/highlight.min.js"></script>
+
+    <style>
+     code { font-family: Operator Mono SSm, monospace; }
+    </style>
+  </head>
+
+  <body>
+    <pre><code id="main" contentEditable>
+#define exchange_json(datap, sizep, keys_fmt, ...) \
+    do { \
+        unsigned int id = (uintptr_t)pthread_self(); \
+        int req_rv = do_exchange(id, datap, sizep, \
+            "{id: %u, " keys_fmt "}", \
+            id, ##__VA_ARGS__); \
+        if (req_rv != 0) return req_rv; \
+    } while (0)
+
+#define parse_and_free_response(data, size, keys_fmt, ...) \
+    do { \
+        if (*keys_fmt == '\0') { \
+            /* empty format string, skip the work */ \
+            free(data); data = NULL; \
+        } else { \
+            int num_expected = count_fmt_args(keys_fmt); \
+            int num_scanned = json_scanf(data, size, \
+                "{" keys_fmt "}", \
+                ##__VA_ARGS__); \
+            if (num_scanned == num_expected) { \
+                free(data); data = NULL; \
+            } else { \
+                eprintln("%s: could only parse %d of %d keys!", \
+                    __func__, num_expected, num_scanned); \
+                free(data); data = NULL; \
+                return -EIO; \
+            } \
+        } \
+    } while (0)
+
+static int tabfs_getattr(const char *path, struct stat *stbuf) {
+    char *rdata;
+    size_t rsize;
+    exchange_json(&rdata, &rsize,
+        "op: %Q, path: %Q",
+        "getattr", path);
+
+    memset(stbuf, 0, sizeof(struct stat));
+    parse_and_free_response(rdata, rsize,
+        "st_mode: %d, st_nlink: %d, st_size: %d",
+        &stbuf->st_mode, &stbuf->st_nlink, &stbuf->st_size);
+
+    return 0;
+}
+    </code></pre>
+
+        <pre><code id="shadow">
+#define exchange_json(datap, sizep, keys_fmt, ...) \
+    do { \
+        unsigned int id = (uintptr_t)pthread_self(); \
+        int req_rv = do_exchange(id, datap, sizep, \
+            "{id: %u, " keys_fmt "}", \
+            id, ##__VA_ARGS__); \
+        if (req_rv != 0) return req_rv; \
+    } while (0)
+
+#define parse_and_free_response(data, size, keys_fmt, ...) \
+    do { \
+        if (*keys_fmt == '\0') { \
+            /* empty format string, skip the work */ \
+            free(data); data = NULL; \
+        } else { \
+            int num_expected = count_fmt_args(keys_fmt); \
+            int num_scanned = json_scanf(data, size, \
+                "{" keys_fmt "}", \
+                ##__VA_ARGS__); \
+            if (num_scanned == num_expected) { \
+                free(data); data = NULL; \
+            } else { \
+                eprintln("%s: could only parse %d of %d keys!", \
+                    __func__, num_expected, num_scanned); \
+                free(data); data = NULL; \
+                return -EIO; \
+            } \
+        } \
+    } while (0)
+
+static int tabfs_getattr(const char *path, struct stat *stbuf) {
+    char *rdata;
+    size_t rsize;
+    do { \
+        unsigned int id = (uintptr_t)pthread_self(); \
+        int req_rv = do_exchange(id, &rdata, &rsize, \
+            "{id: %u, " "op: %Q, path: %Q" "}", \
+            id, "getattr", path); \
+        if (req_rv != 0) return req_rv; \
+    } while (0);
+
+    memset(stbuf, 0, sizeof(struct stat));
+    parse_and_free_response(rdata, rsize,
+        "st_mode: %d, st_nlink: %d, st_size: %d",
+        &stbuf->st_mode, &stbuf->st_nlink, &stbuf->st_size);
+
+    return 0;
+}
+    </code></pre>
+
+    <script>
+     hljs.initHighlightingOnLoad();
+
+     const [main, shadow] = [document.getElementById('main'), document.getElementById('shadow')];
+     main.innerHTML = main.innerText.replace(/(.)/g, '<span>$1</span>');
+     shadow.innerHTML = shadow.innerText.replace(/(.)/g, '<span>$1</span>');
+     // get pos of each char
+
+     document.onmousemove = e => {
+       if (e.target.tagName === 'SPAN') {
+         e.target.style.backgroundColor = 'green';
+       }
+     }
+     
+    </script>
+  </body>
+</html>
