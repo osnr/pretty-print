@@ -6,6 +6,8 @@
 
     <style>
      code { font-family: Operator Mono SSm, monospace; }
+
+     .macro { background-color: orange; }
     </style>
   </head>
 
@@ -109,19 +111,30 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
     </code></pre>
 
     <script>
-     hljs.initHighlightingOnLoad();
-
+     function spanify(s) { return s.replace(/(.)/g, '<span>$1</span>'); }
      const [main, shadow] = [document.getElementById('main'), document.getElementById('shadow')];
-     main.innerHTML = main.innerText.replace(/(.)/g, '<span>$1</span>');
+     main.innerHTML = spanify(main.innerText)
+       .replace(new RegExp(spanify('exchange_json'), 'g'),
+                `<span class="macro exchange_json">${spanify('exchange_json')}</span>`)
+       .replace(new RegExp(spanify('parse_and_free_response'), 'g'),
+                `<span class="macro">${spanify('parse_and_free_response')}</span>`);
      shadow.innerHTML = shadow.innerText.replace(/(.)/g, '<span>$1</span>');
      // get pos of each char
 
-     document.onmousemove = e => {
-       if (e.target.tagName === 'SPAN') {
-         e.target.style.backgroundColor = 'green';
-       }
+     document.onmousedown = e => {
+       // if (e.target.tagName === 'SPAN') {
+       //   e.target.style.backgroundColor = 'green';
+       // }
+       // console.log(e);
      }
+
+     document.querySelectorAll('pre code').forEach((block) => {
+       hljs.highlightBlock(block);
+     });
      
+     document.querySelectorAll('.exchange_json')[1].onmousedown = function(e) {
+       this.style.backgroundColor = 'green';
+     }
     </script>
   </body>
 </html>
