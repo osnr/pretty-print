@@ -9,11 +9,13 @@
     <style>
      code { font-family: Operator Mono SSm, monospace; }
 
-     .character { display: inline-block; transition: transform 10s; }
-     .macro .character { background-color: orange; }
+     .character { display: inline-block; transition: transform 10s ease-in-out; }
+     .macro .character { background-color: pink; }
+     .macro:hover .character { background-color: orange; }
      
-
      pre { position: relative; }
+
+     .highlighted-shadow-char { background-color: green; }
     </style>
   </head>
 
@@ -130,7 +132,8 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
      const differ = new diff_match_patch();
      const diffs = differ.diff_main(main.innerText, shadow.innerText);
      differ.diff_cleanupSemantic(diffs);
-     console.log(differ.patch_make(diffs));
+     const patch = differ.patch_make(diffs);
+
      document.body.innerHTML += differ.diff_prettyHtml(diffs);
      
      document.onmousedown = e => {
@@ -149,12 +152,34 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
      const targetMap = new Map();
 
      for (let [i, char] of mainChars.entries()) {
+       char.shadowIndex = i;
+     }
+
+     for (let [runIdx, run] of patch.entries()) {
+       for (let i = run.start1 + run.length1; i < mainChars.length; i++) {
+         mainChars[i].shadowIndex += run.length2 - run.length1;
+       }
+     }
+
+     for (let [i, char] of mainChars.entries()) {
        const [top, left] = [char.offsetTop, char.offsetLeft];
 
        const shadowChar = shadowChars[i];
+       
        const [shadowTop, shadowLeft] = [shadowChar.offsetTop, shadowChar.offsetLeft];
 
        targetMap.set(char, {dx: shadowLeft - left, dy: shadowTop - top});
+     }
+
+     document.onmousemove = function(e) {
+       const char = e.target.closest('.character');
+       if (!char) return;
+
+       console.log(char.shadowIndex);
+       const shadowChar = shadowChars[char.shadowIndex];
+       [...document.getElementsByClassName('highlighted-shadow-char')]
+         .forEach(sc => sc.classList.remove('highlighted-shadow-char'));
+       shadowChar.classList.add('highlighted-shadow-char');
      }
 
      document.querySelectorAll('.exchange_json')[1].onmousedown = function(e) {
