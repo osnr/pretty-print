@@ -204,7 +204,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
      for (let [i, char] of mainChars.entries()) {
        const [top, left] = [char.offsetTop, char.offsetLeft];
 
-       const shadowChar = shadowChars[i];
+       const shadowChar = shadowChars[char.shadowIndex];
        
        const [shadowTop, shadowLeft] = [shadowChar.offsetTop, shadowChar.offsetLeft];
 
