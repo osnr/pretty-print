@@ -10,17 +10,23 @@
      code { font-family: Operator Mono SSm, monospace; position: relative; }
      #shadow { position: absolute; right: 0; top: 0; }
 
-     .character { display: inline-block; transition: transform 10s ease-in-out; }
-     .macro .character { background-color: pink; }
-     .macro:hover .character { background-color: orange; }
+     .character { display: inline-block; transition: transform 1s ease-in-out; }
+     .macro .character { background-color: pink; outline: 1px solid pink; }
+     .macro:hover .character { background-color: orange; outline: 1px solid orange; }
      
      .highlighted-shadow-char { outline: 1px solid orange; }
+
+     #canv { position: absolute; left: 0; top: 0; outline: 1px solid red; }
+
+     body { margin: 0; }
     </style>
   </head>
 
   <body>
     <pre><code id="main" contentEditable></code></pre>
     <pre><code id="shadow"></code></pre>
+
+    <canvas width="800" height="1000" id="canv"></canvas>
 
     <script>
      const mainText = `
@@ -119,6 +125,33 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
 
     return 0;
 }`.trim();
+
+     (function() {
+       function setDPI(canvas, dpi) {
+         // Set up CSS size.
+         canvas.style.width = canvas.style.width || canvas.width + 'px';
+         canvas.style.height = canvas.style.height || canvas.height + 'px';
+
+         // Resize canvas and scale future draws.
+         var scaleFactor = dpi / 96;
+         canvas.width = Math.ceil(canvas.width * scaleFactor);
+         canvas.height = Math.ceil(canvas.height * scaleFactor);
+         var ctx = canvas.getContext('2d');
+         ctx.scale(scaleFactor, scaleFactor);
+       }
+       
+       const canvas = document.querySelector('canvas');
+       setDPI(canvas, 192);
+       const ctx = canvas.getContext('2d');
+       ctx.textBaseline = 'top';
+       ctx.font = '1em Operator Mono SSm, monospace';
+       const metrics = ctx.measureText('m');
+       let y = 0;
+       for (let line of mainText.split('\n')) {
+         ctx.fillText(line, 0, y);
+         y += 18;
+       }
+     })();
      
      function spanify(s) {
        return s.replace(/(.)/g, '<span class="character">$1</span>')
@@ -182,13 +215,17 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
          
        } else if (kind === 1) {
          let textEnd = shadowI + text.length;
+         const creation = document.createElement('span');
+         creation.classList.add('macro');
          while (shadowI < textEnd) {
            const span = shadowChars[shadowI].cloneNode(true);
            span.style.position = 'absolute';
-           span.style.top = shadowChars[shadowI].offsetTop; span.style.left = shadowChars[shadowI].offsetLeft;
-           creations.push(span);
+           span.style.top = shadowChars[shadowI].offsetTop;
+           span.style.left = shadowChars[shadowI].offsetLeft;
+           creation.appendChild(span);
            shadowI++;
          }
+         creations.push(creation);
        }
      }
 
