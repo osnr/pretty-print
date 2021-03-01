@@ -126,7 +126,8 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
     return 0;
 }`.trim();
 
-     (function() {
+     const mainChars = mainText.split('').map(c => ({c}));
+     const render = (function() {
        function setDPI(canvas, dpi) {
          // Set up CSS size.
          canvas.style.width = canvas.style.width || canvas.width + 'px';
@@ -142,16 +143,46 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        
        const canvas = document.querySelector('canvas');
        setDPI(canvas, 192);
+
        const ctx = canvas.getContext('2d');
        ctx.textBaseline = 'top';
        ctx.font = '1em Operator Mono SSm, monospace';
        const metrics = ctx.measureText('m');
-       let y = 0;
-       for (let line of mainText.split('\n')) {
-         ctx.fillText(line, 0, y);
-         y += 18;
+
+       function charUnder(x, y) {
+         for (let char of mainChars) {
+           if (char.x < x && char.y < y &&
+               x < char.x + metrics.width && y < char.y + 18) {
+             return char;
+           }
+         }
        }
+
+       canvas.onmousemove = function(e) {
+         const char = charUnder(e.offsetX, e.offsetY);
+         if (!char) return;
+
+         ctx.fillStyle = 'green';
+         ctx.fillRect(char.x, char.y, metrics.width, 18);
+       };
+
+       return function render() {
+         let x = 0, y = 0;
+         for (let char of mainChars) {
+           ctx.fillText(char.c, x, y);
+           char.x = x; char.y = y;
+           // mainChars.push({c, x, y});
+           if (char.c === '\n') {
+             x = 0;
+             y += 18;
+           } else {
+             x += metrics.width;
+           }
+         }
+       };
      })();
+
+     render();
      
      function spanify(s) {
        return s.replace(/(.)/g, '<span class="character">$1</span>')
@@ -188,87 +219,69 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        hljs.highlightBlock(block);
      });
 
-     const mainChars = [...document.querySelectorAll('#main .character')];
-     const shadowChars = [...document.querySelectorAll('#shadow .character')];
-     const targetMap = new Map();
-
-     // for (let [i, char] of mainChars.entries()) {
-     //   char.shadowIndex = i;
-     // }
+     // const mainChars = [...document.querySelectorAll('#main .character')];
+     // const shadowChars = [...document.querySelectorAll('#shadow .character')];
+     // const targetMap = new Map();
      // 
-     let i = 0, shadowI = 0;
-     const creations = [];
-     for (let {0: kind, 1: text} of diffs) {
-       if (kind === 0) {
-         let textEnd = i + text.length;
-         while (i < textEnd) {
-           mainChars[i].shadowIndex = shadowI;
-           i++; shadowI++;
-         }
-       } else if (kind === -1) {
-         let textEnd = i + text.length;
-         while (i < textEnd) {
-           // mainChars[i].style.backgroundColor = 'red';
-           mainChars[i].shadowIndex = 0;
-           i++;
-         }
-         
-       } else if (kind === 1) {
-         let textEnd = shadowI + text.length;
-         const creation = document.createElement('span');
-         creation.classList.add('macro');
-         while (shadowI < textEnd) {
-           const span = shadowChars[shadowI].cloneNode(true);
-           span.style.position = 'absolute';
-           span.style.top = shadowChars[shadowI].offsetTop;
-           span.style.left = shadowChars[shadowI].offsetLeft;
-           creation.appendChild(span);
-           shadowI++;
-         }
-         creations.push(creation);
-       }
-     }
-
-     // for (let [runIdx, run] of patch.entries()) {
-     //   mainChars[run.start1].style.backgroundColor = 'orange';
-     //   mainChars[run.start1 + run.length1].style.backgroundColor = 'blue';
-     //   // for (let i = run.start1 + run.length1; i < mainChars.length; i++) {
-     //   //   if (runIdx === 0) {
-     //   //     mainChars[i].style.backgroundColor = 'orange';
-     //   //   }
-     //   //   if (runIdx === 1) {
-     //   //     mainChars[i].style.backgroundColor = 'pink'; 
-     //   //   }
-     //   //   // mainChars[i].shadowIndex += run.length2 - run.length1;
-     //   // }
-     // }
-
-     for (let [i, char] of mainChars.entries()) {
-       const shadowChar = shadowChars[char.shadowIndex];
-       const [top, left] = [char.offsetTop, char.offsetLeft];
-       const [shadowTop, shadowLeft] = [shadowChar.offsetTop, shadowChar.offsetLeft];
-       targetMap.set(char, {dx: shadowLeft - left, dy: shadowTop - top});
-     }
-
-     document.onmousemove = function(e) {
-       const char = e.target.closest('#main .character');
-       if (!char) return;
-
-       // console.log(char.shadowIndex);
-       const shadowChar = shadowChars[char.shadowIndex];
-       [...document.getElementsByClassName('highlighted-shadow-char')]
-         .forEach(sc => sc.classList.remove('highlighted-shadow-char'));
-       shadowChar.classList.add('highlighted-shadow-char');
-     }
-
-     document.querySelectorAll('.exchange_json')[1].onmousedown = function(e) {
-       for (let char of mainChars) {
-         const {dx, dy} = targetMap.get(char);
-         char.style.transform = `translate(${dx}px, ${dy}px)`;
-       }
-
-       creations.forEach(c => { main.appendChild(c); });
-     }
+     //      let i = 0, shadowI = 0;
+     //      const creations = [];
+     //      for (let {0: kind, 1: text} of diffs) {
+     //        if (kind === 0) {
+     //          let textEnd = i + text.length;
+     //          while (i < textEnd) {
+     //            mainChars[i].shadowIndex = shadowI;
+     //            i++; shadowI++;
+     //          }
+     //        } else if (kind === -1) {
+     //          let textEnd = i + text.length;
+     //          while (i < textEnd) {
+     //            // mainChars[i].style.backgroundColor = 'red';
+     //            mainChars[i].shadowIndex = 0;
+     //            i++;
+     //          }
+     //          
+     //        } else if (kind === 1) {
+     //          let textEnd = shadowI + text.length;
+     //          const creation = document.createElement('span');
+     //          creation.classList.add('macro');
+     //          while (shadowI < textEnd) {
+     //            const span = shadowChars[shadowI].cloneNode(true);
+     //            span.style.position = 'absolute';
+     //            span.style.top = shadowChars[shadowI].offsetTop;
+     //            span.style.left = shadowChars[shadowI].offsetLeft;
+     //            creation.appendChild(span);
+     //            shadowI++;
+     //          }
+     //          creations.push(creation);
+     //        }
+     //      }
+     // 
+     //      for (let [i, char] of mainChars.entries()) {
+     //        const shadowChar = shadowChars[char.shadowIndex];
+     //        const [top, left] = [char.offsetTop, char.offsetLeft];
+     //        const [shadowTop, shadowLeft] = [shadowChar.offsetTop, shadowChar.offsetLeft];
+     //        targetMap.set(char, {dx: shadowLeft - left, dy: shadowTop - top});
+     //      }
+     // 
+     //      document.onmousemove = function(e) {
+     //        const char = e.target.closest('#main .character');
+     //        if (!char) return;
+     // 
+     //        // console.log(char.shadowIndex);
+     //        const shadowChar = shadowChars[char.shadowIndex];
+     //        [...document.getElementsByClassName('highlighted-shadow-char')]
+     //          .forEach(sc => sc.classList.remove('highlighted-shadow-char'));
+     //        shadowChar.classList.add('highlighted-shadow-char');
+     //      }
+     // 
+     //      document.querySelectorAll('.exchange_json')[1].onmousedown = function(e) {
+     //        for (let char of mainChars) {
+     //          const {dx, dy} = targetMap.get(char);
+     //          char.style.transform = `translate(${dx}px, ${dy}px)`;
+     //        }
+     // 
+     //        creations.forEach(c => { main.appendChild(c); });
+     //      }
     </script>
   </body>
 </html>
