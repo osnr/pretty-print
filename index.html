@@ -7,48 +7,51 @@
     <script src="vendor/diff_match_patch.js"></script>
 
     <style>
-     code { font-family: Operator Mono SSm, monospace; }
+     code { font-family: Operator Mono SSm, monospace; position: relative; }
+     #shadow { position: absolute; right: 0; top: 0; }
 
      .character { display: inline-block; transition: transform 10s ease-in-out; }
      .macro .character { background-color: pink; }
      .macro:hover .character { background-color: orange; }
      
-     pre { position: relative; }
-
      .highlighted-shadow-char { background-color: green; }
     </style>
   </head>
 
   <body>
-    <pre><code id="main" contentEditable>
-#define exchange_json(datap, sizep, keys_fmt, ...) \
-    do { \
-        unsigned int id = (uintptr_t)pthread_self(); \
-        int req_rv = do_exchange(id, datap, sizep, \
-            "{id: %u, " keys_fmt "}", \
-            id, ##__VA_ARGS__); \
-        if (req_rv != 0) return req_rv; \
+    <pre><code id="main" contentEditable></code></pre>
+    <pre><code id="shadow"></code></pre>
+
+    <script>
+     const mainText = `
+#define exchange_json(datap, sizep, keys_fmt, ...) \\
+    do { \\
+        unsigned int id = (uintptr_t)pthread_self(); \\
+        int req_rv = do_exchange(id, datap, sizep, \\
+            "{id: %u, " keys_fmt "}", \\
+            id, ##__VA_ARGS__); \\
+        if (req_rv != 0) return req_rv; \\
     } while (0)
 
-#define parse_and_free_response(data, size, keys_fmt, ...) \
-    do { \
-        if (*keys_fmt == '\0') { \
-            /* empty format string, skip the work */ \
-            free(data); data = NULL; \
-        } else { \
-            int num_expected = count_fmt_args(keys_fmt); \
-            int num_scanned = json_scanf(data, size, \
-                "{" keys_fmt "}", \
-                ##__VA_ARGS__); \
-            if (num_scanned == num_expected) { \
-                free(data); data = NULL; \
-            } else { \
-                eprintln("%s: could only parse %d of %d keys!", \
-                    __func__, num_expected, num_scanned); \
-                free(data); data = NULL; \
-                return -EIO; \
-            } \
-        } \
+#define parse_and_free_response(data, size, keys_fmt, ...) \\
+    do { \\
+        if (*keys_fmt == '\\0') { \\
+            /* empty format string, skip the work */ \\
+            free(data); data = NULL; \\
+        } else { \\
+            int num_expected = count_fmt_args(keys_fmt); \\
+            int num_scanned = json_scanf(data, size, \\
+                "{" keys_fmt "}", \\
+                ##__VA_ARGS__); \\
+            if (num_scanned == num_expected) { \\
+                free(data); data = NULL; \\
+            } else { \\
+                eprintln("%s: could only parse %d of %d keys!", \\
+                    __func__, num_expected, num_scanned); \\
+                free(data); data = NULL; \\
+                return -EIO; \\
+            } \\
+        } \\
     } while (0)
 
 static int tabfs_getattr(const char *path, struct stat *stbuf) {
@@ -65,48 +68,48 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
 
     return 0;
 }
-    </code></pre>
+     `.trim();
 
-        <pre><code id="shadow">
-#define exchange_json(datap, sizep, keys_fmt, ...) \
-    do { \
-        unsigned int id = (uintptr_t)pthread_self(); \
-        int req_rv = do_exchange(id, datap, sizep, \
-            "{id: %u, " keys_fmt "}", \
-            id, ##__VA_ARGS__); \
-        if (req_rv != 0) return req_rv; \
+     const shadowText = `
+#define exchange_json(datap, sizep, keys_fmt, ...) \\
+    do { \\
+        unsigned int id = (uintptr_t)pthread_self(); \\
+        int req_rv = do_exchange(id, datap, sizep, \\
+            "{id: %u, " keys_fmt "}", \\
+            id, ##__VA_ARGS__); \\
+        if (req_rv != 0) return req_rv; \\
     } while (0)
 
-#define parse_and_free_response(data, size, keys_fmt, ...) \
-    do { \
-        if (*keys_fmt == '\0') { \
-            /* empty format string, skip the work */ \
-            free(data); data = NULL; \
-        } else { \
-            int num_expected = count_fmt_args(keys_fmt); \
-            int num_scanned = json_scanf(data, size, \
-                "{" keys_fmt "}", \
-                ##__VA_ARGS__); \
-            if (num_scanned == num_expected) { \
-                free(data); data = NULL; \
-            } else { \
-                eprintln("%s: could only parse %d of %d keys!", \
-                    __func__, num_expected, num_scanned); \
-                free(data); data = NULL; \
-                return -EIO; \
-            } \
-        } \
+#define parse_and_free_response(data, size, keys_fmt, ...) \\
+    do { \\
+        if (*keys_fmt == '\\0') { \\
+            /* empty format string, skip the work */ \\
+            free(data); data = NULL; \\
+        } else { \\
+            int num_expected = count_fmt_args(keys_fmt); \\
+            int num_scanned = json_scanf(data, size, \\
+                "{" keys_fmt "}", \\
+                ##__VA_ARGS__); \\
+            if (num_scanned == num_expected) { \\
+                free(data); data = NULL; \\
+            } else { \\
+                eprintln("%s: could only parse %d of %d keys!", \\
+                    __func__, num_expected, num_scanned); \\
+                free(data); data = NULL; \\
+                return -EIO; \\
+            } \\
+        } \\
     } while (0)
 
 static int tabfs_getattr(const char *path, struct stat *stbuf) {
     char *rdata;
     size_t rsize;
-    do { \
-        unsigned int id = (uintptr_t)pthread_self(); \
-        int req_rv = do_exchange(id, &rdata, &rsize, \
-            "{id: %u, " "op: %Q, path: %Q" "}", \
-            id, "getattr", path); \
-        if (req_rv != 0) return req_rv; \
+    do { \\
+        unsigned int id = (uintptr_t)pthread_self(); \\
+        int req_rv = do_exchange(id, &rdata, &rsize, \\
+            "{id: %u, " "op: %Q, path: %Q" "}", \\
+            id, "getattr", path); \\
+        if (req_rv != 0) return req_rv; \\
     } while (0);
 
     memset(stbuf, 0, sizeof(struct stat));
@@ -115,26 +118,31 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
         &stbuf->st_mode, &stbuf->st_nlink, &stbuf->st_size);
 
     return 0;
-}
-    </code></pre>
+}`.trim();
+     
+     function spanify(s) {
+       return s.replace(/(.)/g, '<span class="character">$1</span>')
+               .replace(/\n/g, '<span class="character">\n</span>\n');
+     }
 
-    <script>
-     function spanify(s) { return s.replace(/(.)/g, '<span class="character">$1</span>'); }
      const [main, shadow] = [document.getElementById('main'), document.getElementById('shadow')];
-     main.innerHTML = spanify(main.innerText)
+
+     main.innerHTML = spanify(mainText)
        .replace(new RegExp(spanify('exchange_json'), 'g'),
                 `<span class="macro exchange_json">${spanify('exchange_json')}</span>`)
        .replace(new RegExp(spanify('parse_and_free_response'), 'g'),
                 `<span class="macro">${spanify('parse_and_free_response')}</span>`);
-     shadow.innerHTML = shadow.innerText.replace(/(.)/g, '<span class="character">$1</span>');
+
+     shadow.innerHTML = spanify(shadowText);
+
      // get pos of each char
 
      const differ = new diff_match_patch();
-     const diffs = differ.diff_main(main.innerText, shadow.innerText);
+     const diffs = differ.diff_main(mainText, shadowText);
      differ.diff_cleanupSemantic(diffs);
-     const patch = differ.patch_make(diffs);
+     console.log(diffs);
 
-     document.body.innerHTML += differ.diff_prettyHtml(diffs);
+     document.body.innerHTML += '<pre>' + differ.diff_prettyHtml(diffs) + '</pre>';
      
      document.onmousedown = e => {
        // if (e.target.tagName === 'SPAN') {
@@ -151,15 +159,47 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
      const shadowChars = [...document.querySelectorAll('#shadow .character')];
      const targetMap = new Map();
 
-     for (let [i, char] of mainChars.entries()) {
-       char.shadowIndex = i;
-     }
-
-     for (let [runIdx, run] of patch.entries()) {
-       for (let i = run.start1 + run.length1; i < mainChars.length; i++) {
-         mainChars[i].shadowIndex += run.length2 - run.length1;
+     // for (let [i, char] of mainChars.entries()) {
+     //   char.shadowIndex = i;
+     // }
+     // 
+     let i = 0, shadowI = 0;
+     for (let {0: kind, 1: text} of diffs) {
+       if (kind === 0) {
+         let textEnd = i + text.length;
+         while (i < textEnd) {
+           mainChars[i].shadowIndex = shadowI;
+           i++; shadowI++;
+         }
+       } else if (kind === -1) {
+         let textEnd = i + text.length;
+         while (i < textEnd) {
+           mainChars[i].style.backgroundColor = 'red';
+           mainChars[i].shadowIndex = 0;
+           i++;
+         }
+         
+       } else if (kind === 1) {
+         let textEnd = shadowI + text.length;
+         while (shadowI < textEnd) {
+           shadowI++;
+         }
        }
      }
+
+     // for (let [runIdx, run] of patch.entries()) {
+     //   mainChars[run.start1].style.backgroundColor = 'orange';
+     //   mainChars[run.start1 + run.length1].style.backgroundColor = 'blue';
+     //   // for (let i = run.start1 + run.length1; i < mainChars.length; i++) {
+     //   //   if (runIdx === 0) {
+     //   //     mainChars[i].style.backgroundColor = 'orange';
+     //   //   }
+     //   //   if (runIdx === 1) {
+     //   //     mainChars[i].style.backgroundColor = 'pink'; 
+     //   //   }
+     //   //   // mainChars[i].shadowIndex += run.length2 - run.length1;
+     //   // }
+     // }
 
      for (let [i, char] of mainChars.entries()) {
        const [top, left] = [char.offsetTop, char.offsetLeft];
@@ -172,7 +212,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
      }
 
      document.onmousemove = function(e) {
-       const char = e.target.closest('.character');
+       const char = e.target.closest('#main .character');
        if (!char) return;
 
        console.log(char.shadowIndex);
