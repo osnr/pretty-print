@@ -14,7 +14,7 @@
      .macro .character { background-color: pink; }
      .macro:hover .character { background-color: orange; }
      
-     .highlighted-shadow-char { background-color: green; }
+     .highlighted-shadow-char { outline: 1px solid orange; }
     </style>
   </head>
 
@@ -142,7 +142,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
      differ.diff_cleanupSemantic(diffs);
      console.log(diffs);
 
-     document.body.innerHTML += '<pre>' + differ.diff_prettyHtml(diffs) + '</pre>';
+     // document.body.innerHTML = '<pre>' + differ.diff_prettyHtml(diffs) + '</pre>';
      
      document.onmousedown = e => {
        // if (e.target.tagName === 'SPAN') {
@@ -164,6 +164,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
      // }
      // 
      let i = 0, shadowI = 0;
+     const creations = [];
      for (let {0: kind, 1: text} of diffs) {
        if (kind === 0) {
          let textEnd = i + text.length;
@@ -174,7 +175,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        } else if (kind === -1) {
          let textEnd = i + text.length;
          while (i < textEnd) {
-           mainChars[i].style.backgroundColor = 'red';
+           // mainChars[i].style.backgroundColor = 'red';
            mainChars[i].shadowIndex = 0;
            i++;
          }
@@ -182,6 +183,10 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        } else if (kind === 1) {
          let textEnd = shadowI + text.length;
          while (shadowI < textEnd) {
+           const span = shadowChars[shadowI].cloneNode(true);
+           span.style.position = 'absolute';
+           span.style.top = shadowChars[shadowI].offsetTop; span.style.left = shadowChars[shadowI].offsetLeft;
+           creations.push(span);
            shadowI++;
          }
        }
@@ -202,12 +207,9 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
      // }
 
      for (let [i, char] of mainChars.entries()) {
-       const [top, left] = [char.offsetTop, char.offsetLeft];
-
        const shadowChar = shadowChars[char.shadowIndex];
-       
+       const [top, left] = [char.offsetTop, char.offsetLeft];
        const [shadowTop, shadowLeft] = [shadowChar.offsetTop, shadowChar.offsetLeft];
-
        targetMap.set(char, {dx: shadowLeft - left, dy: shadowTop - top});
      }
 
@@ -215,7 +217,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        const char = e.target.closest('#main .character');
        if (!char) return;
 
-       console.log(char.shadowIndex);
+       // console.log(char.shadowIndex);
        const shadowChar = shadowChars[char.shadowIndex];
        [...document.getElementsByClassName('highlighted-shadow-char')]
          .forEach(sc => sc.classList.remove('highlighted-shadow-char'));
@@ -227,6 +229,8 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
          const {dx, dy} = targetMap.get(char);
          char.style.transform = `translate(${dx}px, ${dy}px)`;
        }
+
+       creations.forEach(c => { main.appendChild(c); });
      }
     </script>
   </body>
