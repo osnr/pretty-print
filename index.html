@@ -193,7 +193,14 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
            }
            ctx.clearRect(0, 0, 1000, 1000);
            renderer.render(mainChars, 0, mainChars.length - 1, false);
-           renderer.render(createChars, 0, createChars.length - 1, false);
+           for (let createChars of createCharRuns) {
+             for (let char of createChars) {
+               char.ox = char.x; char.oy = char.y
+               char.x = createChars[0].ox* (1-easeInOutCubic(t/duration)) + char.ox * easeInOutCubic(t/duration);
+               char.y = createChars[0].oy* (1-easeInOutCubic(t/duration)) + char.oy * easeInOutCubic(t/duration);
+             }
+             renderer.render(createChars, 0, createChars.length - 1, false);
+           }
 
            t += 10 * 0.001;
            if (t >= duration) {
@@ -201,29 +208,29 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
            }
          }, 10);
        };
-
-       canvas.onmouseup = function(e) {
-         let duration = 1; // in seconds
-         let t = 0;
-         const interval = setInterval(function() {
-           ctx.clearRect(0, 0, 1000, 1000);
-           renderer.render(mainChars, 0, mainChars.length - 1, true);
-           
-           for (let char of mainChars) {
-             char.ox = char.x; char.oy = char.y
-             char.x = char.ox* (easeInOutCubic(t/duration)) + shadowChars[char.shadowIndex].x * (1-easeInOutCubic(t/duration));
-             char.y = char.oy* (easeInOutCubic(t/duration)) + shadowChars[char.shadowIndex].y * (1-easeInOutCubic(t/duration));
-           }
-
-           ctx.clearRect(0, 0, 1000, 1000);
-           renderer.render(mainChars, 0, mainChars.length - 1, false);
-
-           t += 10 * 0.001;
-           if (t >= duration) {
-             clearInterval(interval);
-           }
-         }, 10);
-       };
+       // 
+       //        canvas.onmouseup = function(e) {
+       //          let duration = 1; // in seconds
+       //          let t = 0;
+       //          const interval = setInterval(function() {
+       //            ctx.clearRect(0, 0, 1000, 1000);
+       //            renderer.render(mainChars, 0, mainChars.length - 1, true);
+       //            
+       //            for (let char of mainChars) {
+       //              char.ox = char.x; char.oy = char.y
+       //              char.x = char.ox* (easeInOutCubic(t/duration)) + shadowChars[char.shadowIndex].x * (1-easeInOutCubic(t/duration));
+       //              char.y = char.oy* (easeInOutCubic(t/duration)) + shadowChars[char.shadowIndex].y * (1-easeInOutCubic(t/duration));
+       //            }
+       // 
+       //            ctx.clearRect(0, 0, 1000, 1000);
+       //            renderer.render(mainChars, 0, mainChars.length - 1, false);
+       // 
+       //            t += 10 * 0.001;
+       //            if (t >= duration) {
+       //              clearInterval(interval);
+       //            }
+       //          }, 10);
+       //        };
 
        return {
          render(chars, startIdx = 0, endIdx = chars.length - 1, computePositions = true) {
@@ -254,40 +261,14 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
      renderer.ctx.translate(600, 0);
      renderer.render(shadowChars);
      renderer.ctx.restore();
-     
-     // function spanify(s) {
-     //   return s.replace(/(.)/g, '<span class="character">$1</span>')
-     //           .replace(/\n/g, '<span class="character">\n</span>\n');
-     // }
-     // 
-     //      const [main, shadow] = [document.getElementById('main'), document.getElementById('shadow')];
-     // 
-     //      main.innerHTML = spanify(mainText)
-     //        .replace(new RegExp(spanify('exchange_json'), 'g'),
-     //                 `<span class="macro exchange_json">${spanify('exchange_json')}</span>`)
-     //        .replace(new RegExp(spanify('parse_and_free_response'), 'g'),
-     //                 `<span class="macro">${spanify('parse_and_free_response')}</span>`);
-     // 
-     //      shadow.innerHTML = spanify(shadowText);
-
-     // get pos of each char
 
      const differ = new diff_match_patch();
      const diffs = differ.diff_main(mainText, shadowText);
      differ.diff_cleanupSemantic(diffs);
      console.log(diffs);
 
-     // document.body.innerHTML = '<pre>' + differ.diff_prettyHtml(diffs) + '</pre>';
-
-     // document.querySelectorAll('pre code').forEach((block) => {
-     //   hljs.highlightBlock(block);
-     // });
-
-     // const targetMap = new Map();
-     // 
-
      let i = 0, shadowI = 0;
-     const createChars = [];
+     const createCharRuns = [];
      for (let {0: kind, 1: text} of diffs) {
        if (kind === 0) {
          let textEnd = i + text.length;
@@ -304,6 +285,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
          }
          
        } else if (kind === 1) {
+         const createChars = [];
          let textEnd = shadowI + text.length;
          while (shadowI < textEnd) {
            // const span = shadowChars[shadowI].cloneNode(true);
@@ -314,35 +296,9 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
            createChars.push({...shadowChars[shadowI]})
            shadowI++;
          }
+         createCharRuns.push(createChars);
        }
      }
-     // 
-     // for (let [i, char] of mainChars.entries()) {
-     //   const shadowChar = shadowChars[char.shadowIndex];
-     //   const [top, left] = [char.offsetTop, char.offsetLeft];
-     //   const [shadowTop, shadowLeft] = [shadowChar.offsetTop, shadowChar.offsetLeft];
-     //   targetMap.set(char, {dx: shadowLeft - left, dy: shadowTop - top});
-     // }
-     // 
-     // document.onmousemove = function(e) {
-     //   const char = e.target.closest('#main .character');
-     //   if (!char) return;
-     //   
-     //   // console.log(char.shadowIndex);
-     //   const shadowChar = shadowChars[char.shadowIndex];
-     //   [...document.getElementsByClassName('highlighted-shadow-char')]
-     //     .forEach(sc => sc.classList.remove('highlighted-shadow-char'));
-     //   shadowChar.classList.add('highlighted-shadow-char');
-     // }
-     // 
-     // document.querySelectorAll('.exchange_json')[1].onmousedown = function(e) {
-     //   for (let char of mainChars) {
-     //     const {dx, dy} = targetMap.get(char);
-     //     char.style.transform = `translate(${dx}px, ${dy}px)`;
-     //   }
-     //   
-     //   creations.forEach(c => { main.appendChild(c); });
-     // }
     </script>
   </body>
 </html>
