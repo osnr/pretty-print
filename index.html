@@ -181,32 +181,36 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        function easeInOutCubic(x) {
          return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
        }
-       
-       canvas.onmousedown = function(e) {
-         let duration = 1; // in seconds
+       function runAnimation(fn, duration) {
          let t = 0;
+         let x0s = {};
          const interval = setInterval(function() {
-           for (let char of mainChars) {
-             char.ox = char.x; char.oy = char.y
-             char.x = char.ox* (1-easeInOutCubic(t/duration)) + shadowChars[char.shadowIndex].x * easeInOutCubic(t/duration);
-             char.y = char.oy* (1-easeInOutCubic(t/duration)) + shadowChars[char.shadowIndex].y * easeInOutCubic(t/duration);
-           }
-           ctx.clearRect(0, 0, 1000, 1000);
-           renderer.render(mainChars, 0, mainChars.length - 1, false);
-           for (let createChars of createCharRuns) {
-             for (let char of createChars) {
-               char.ox = char.x; char.oy = char.y
-               char.x = createChars[0].ox* (1-easeInOutCubic(t/duration)) + char.ox * easeInOutCubic(t/duration);
-               char.y = createChars[0].oy* (1-easeInOutCubic(t/duration)) + char.oy * easeInOutCubic(t/duration);
-             }
-             renderer.render(createChars, 0, createChars.length - 1, false);
-           }
+           let key = 0;
+           fn(function(x0, x1) {
+             // the x0 may change, so we store the first time we get it for a key.
+             if (key in x0s) { x0 = x0s[key]; }
+             else { x0s[key] = x0; }
+             key++;
+             return x0 * (1 - easeInOutCubic(t / duration)) + x1 * easeInOutCubic(t/ duration);
+           });
 
            t += 10 * 0.001;
            if (t >= duration) {
              clearInterval(interval);
            }
          }, 10);
+       }
+
+       canvas.onmousedown = function(e) {
+         runAnimation(animate => {
+           for (let char of mainChars) {
+             const shadowChar = shadowChars[char.shadowIndex];
+             char.x = animate(char.x, shadowChar.x);
+             char.y = animate(char.y, shadowChar.y);
+           }
+           ctx.clearRect(0, 0, 1000, 1000);
+           renderer.render(mainChars, 0, mainChars.length - 1, false);
+         }, 1);
        };
        // 
        //        canvas.onmouseup = function(e) {
