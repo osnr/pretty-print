@@ -183,14 +183,14 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        }
        function runAnimation(fn, duration) {
          let t = 0;
-         let x0s = {};
+         let fixed = {};
          const interval = setInterval(function() {
            let key = 0;
-           fn(function(x0, x1) {
-             // the x0 may change, so we store the first time we get it for a key.
-             if (key in x0s) { x0 = x0s[key]; }
-             else { x0s[key] = x0; }
-             key++;
+           fn(function fix(x) {
+             if (key in fixed) { x = fixed[key]; }
+             else { fixed[key] = x; }
+             key++; return x;
+           }, function animate(x0, x1) {
              return x0 * (1 - easeInOutCubic(t / duration)) + x1 * easeInOutCubic(t/ duration);
            });
 
@@ -202,14 +202,22 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        }
 
        canvas.onmousedown = function(e) {
-         runAnimation(animate => {
+         runAnimation((fix, animate) => {
            for (let char of mainChars) {
              const shadowChar = shadowChars[char.shadowIndex];
-             char.x = animate(char.x, shadowChar.x);
-             char.y = animate(char.y, shadowChar.y);
+             char.x = animate(fix(char.x), shadowChar.x);
+             char.y = animate(fix(char.y), shadowChar.y);
            }
            ctx.clearRect(0, 0, 1000, 1000);
            renderer.render(mainChars, 0, mainChars.length - 1, false);
+
+           for (let createChars of createCharRuns) {
+             for (let char of createChars) {
+               char.x = animate(fix(createChars[0].x), fix(char.x));
+               char.y = animate(fix(createChars[0].y), fix(char.y));
+             }
+             renderer.render(createChars, 0, createChars.length - 1, false);
+           }
          }, 1);
        };
        // 
