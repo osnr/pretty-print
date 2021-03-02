@@ -177,12 +177,12 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
          ctx.restore();
        };
 
+       
+       function easeInOutCubic(x) {
+         return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+       }
+       
        canvas.onmousedown = function(e) {
-         // FIXME: animate to shadow positions
-         function easeInOutCubic(x) {
-           return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-         }
-
          let duration = 1; // in seconds
          let t = 0;
          const interval = setInterval(function() {
@@ -194,6 +194,29 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
            ctx.clearRect(0, 0, 1000, 1000);
            renderer.render(mainChars, 0, mainChars.length - 1, false);
            renderer.render(createChars, 0, createChars.length - 1, false);
+
+           t += 10 * 0.001;
+           if (t >= duration) {
+             clearInterval(interval);
+           }
+         }, 10);
+       };
+
+       canvas.onmouseup = function(e) {
+         let duration = 1; // in seconds
+         let t = 0;
+         const interval = setInterval(function() {
+           ctx.clearRect(0, 0, 1000, 1000);
+           renderer.render(mainChars, 0, mainChars.length - 1, true);
+           
+           for (let char of mainChars) {
+             char.ox = char.x; char.oy = char.y
+             char.x = char.ox* (easeInOutCubic(t/duration)) + shadowChars[char.shadowIndex].x * (1-easeInOutCubic(t/duration));
+             char.y = char.oy* (easeInOutCubic(t/duration)) + shadowChars[char.shadowIndex].y * (1-easeInOutCubic(t/duration));
+           }
+
+           ctx.clearRect(0, 0, 1000, 1000);
+           renderer.render(mainChars, 0, mainChars.length - 1, false);
 
            t += 10 * 0.001;
            if (t >= duration) {
