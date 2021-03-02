@@ -193,6 +193,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
            }
            ctx.clearRect(0, 0, 1000, 1000);
            renderer.render(mainChars, 0, mainChars.length - 1, false);
+           renderer.render(createChars, 0, createChars.length - 1, false);
 
            t += 10 * 0.001;
            if (t >= duration) {
@@ -263,7 +264,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
      // 
 
      let i = 0, shadowI = 0;
-     const creations = [];
+     const createChars = [];
      for (let {0: kind, 1: text} of diffs) {
        if (kind === 0) {
          let textEnd = i + text.length;
@@ -281,17 +282,15 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
          
        } else if (kind === 1) {
          let textEnd = shadowI + text.length;
-         const creation = document.createElement('span');
-         creation.classList.add('macro');
          while (shadowI < textEnd) {
            // const span = shadowChars[shadowI].cloneNode(true);
            // span.style.position = 'absolute';
            // span.style.top = shadowChars[shadowI].offsetTop;
            // span.style.left = shadowChars[shadowI].offsetLeft;
            // creation.appendChild(span);
+           createChars.push({...shadowChars[shadowI]})
            shadowI++;
          }
-         creations.push(creation);
        }
      }
      // 
