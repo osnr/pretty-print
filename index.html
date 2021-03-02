@@ -177,12 +177,34 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
          ctx.restore();
        };
 
+       canvas.onmousedown = function(e) {
+         // FIXME: animate to shadow positions
+         function easeInOutCubic(x) {
+           return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+         }
+
+         let duration = 1; // in seconds
+         let t = 0;
+         const interval = setInterval(function() {
+           for (let char of mainChars) {
+             char.offsetX = easeInOutCubic(t/duration) * 100;
+           }
+           ctx.clearRect(0, 0, 1000, 1000);
+           renderer.render(mainChars);
+
+           t += 40 * 0.001;
+           if (t >= duration) {
+             clearInterval(interval);
+           }
+         }, 40);
+       };
+
        return {
          render(chars, startIdx = 0, endIdx = chars.length - 1) {
            let {x, y} = chars[startIdx];
            for (let i = startIdx; i < endIdx; i++) {
              const char = chars[i];
-             ctx.fillText(char.c, x, y);
+             ctx.fillText(char.c, x + (char.offsetX || 0), y + (char.offsetY || 0));
              char.x = x; char.y = y;
 
              if (char.c === '\n') {
