@@ -187,25 +187,28 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
          let t = 0;
          const interval = setInterval(function() {
            for (let char of mainChars) {
-             char.offsetX = easeInOutCubic(t/duration) * 100;
+             char.ox = char.x; char.oy = char.y
+             char.x = char.ox* (1-easeInOutCubic(t/duration)) + shadowChars[char.shadowIndex].x * easeInOutCubic(t/duration);
+             char.y = char.oy* (1-easeInOutCubic(t/duration)) + shadowChars[char.shadowIndex].y * easeInOutCubic(t/duration);
            }
            ctx.clearRect(0, 0, 1000, 1000);
-           renderer.render(mainChars);
+           renderer.render(mainChars, 0, mainChars.length - 1, false);
 
-           t += 40 * 0.001;
+           t += 10 * 0.001;
            if (t >= duration) {
              clearInterval(interval);
            }
-         }, 40);
+         }, 10);
        };
 
        return {
-         render(chars, startIdx = 0, endIdx = chars.length - 1) {
+         render(chars, startIdx = 0, endIdx = chars.length - 1, computePositions = true) {
            let {x, y} = chars[startIdx];
-           for (let i = startIdx; i < endIdx; i++) {
+           for (let i = startIdx; i <= endIdx; i++) {
              const char = chars[i];
-             ctx.fillText(char.c, x + (char.offsetX || 0), y + (char.offsetY || 0));
-             char.x = x; char.y = y;
+
+             if (computePositions) { char.x = x; char.y = y; }
+             ctx.fillText(char.c, char.x, char.y);
 
              if (char.c === '\n') {
                x = 0;
