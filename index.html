@@ -181,24 +181,34 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        function easeInOutCubic(x) {
          return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
        }
+       function easeInOutElastic(x) {
+         const c5 = (2 * Math.PI) / 4.5;
+
+         return x === 0
+              ? 0
+              : x === 1
+              ? 1
+              : x < 0.5
+                  ? -(Math.pow(2, 20 * x - 10) * Math.sin((20 * x - 11.125) * c5)) / 2
+                  : (Math.pow(2, -20 * x + 10) * Math.sin((20 * x - 11.125) * c5)) / 2 + 1;
+       }
        function runAnimation(fn, duration) {
-         let t = 0;
+         let t0 = performance.now();
          let fixed = {};
-         const interval = setInterval(function() {
+         requestAnimationFrame(function frame(t) {
            let key = 0;
            fn(function fix(x) {
              if (key in fixed) { x = fixed[key]; }
              else { fixed[key] = x; }
              key++; return x;
-           }, function animate(x0, x1) {
-             return x0 * (1 - easeInOutCubic(t / duration)) + x1 * easeInOutCubic(t/ duration);
+           }, function animate(x0, x1, ease = easeInOutCubic) {
+             return x0 * (1 - ease((t - t0) / duration)) + x1 * ease((t - t0) / duration);
            });
 
-           t += 10 * 0.001;
-           if (t >= duration) {
-             clearInterval(interval);
+           if (t < t0 + duration) {
+             requestAnimationFrame(frame);
            }
-         }, 10);
+         });
        }
 
        canvas.onmousedown = function(e) {
@@ -212,13 +222,27 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
            renderer.render(mainChars, 0, mainChars.length - 1, false);
 
            for (let createChars of createCharRuns) {
-             for (let char of createChars) {
-               char.x = animate(fix(createChars[0].x), fix(char.x));
-               char.y = animate(fix(createChars[0].y), fix(char.y));
-             }
+             ctx.save();
+             ctx.fillStyle = `rgba(0, 0, 0, ${animate(0, 1)})`;
              renderer.render(createChars, 0, createChars.length - 1, false);
+             ctx.restore();
            }
-         }, 1);
+         }, 500);
+       };
+       canvas.onmouseup = function(e) {
+         runAnimation((fix, animate) => {
+           // just to recompute positions.
+           ctx.clearRect(0, 0, 1000, 1000);
+           renderer.render(mainChars, 0, mainChars.length - 1, true);
+           
+           for (let char of mainChars) {
+             const shadowChar = shadowChars[char.shadowIndex];
+             char.x = animate(shadowChar.x, fix(char.x));
+             char.y = animate(shadowChar.y, fix(char.y));
+           }
+           ctx.clearRect(0, 0, 1000, 1000);
+           renderer.render(mainChars, 0, mainChars.length - 1, false);
+         }, 1000);
        };
        // 
        //        canvas.onmouseup = function(e) {
