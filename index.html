@@ -154,43 +154,50 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
          }
        }
 
+       function renderSpans() {
+         // colored halos
+       }
+
        canvas.onmousemove = function(e) {
          const charIdx = charIndexUnder(e.offsetX, e.offsetY);
          const char = mainChars[charIdx];
          if (!char) return;
 
-         ctx.save();
-         ctx.fillStyle = 'green';
-         ctx.fillRect(char.x, char.y, metrics.width, 18);
-         ctx.restore();
-         renderer.render(mainChars, charIdx, charIdx + 1);
+         ctx.clearRect(0, 0, 1000, 1000);
 
-         const shadowIdx = char.shadowIndex;
-         const shadowChar = shadowChars[shadowIdx];
-         ctx.save();
-         ctx.translate(600, 0);
-         ctx.save();
-         ctx.fillStyle = 'orange';
-         ctx.fillRect(shadowChar.x, shadowChar.y, metrics.width, 18);
-         ctx.restore();
-         renderer.render(shadowChars, shadowIdx, shadowIdx + 1);
-         ctx.restore();
+         document.body.style.cursor = (function() {
+           for (let [spanStart, spanEnd] of mainChars.spans) {
+             if (spanStart <= charIdx && charIdx <= spanEnd) {
+               return 'pointer';
+             }
+           }
+           return 'auto';
+         })();
+
+         renderSpans();
+         renderer.render(mainChars);
+
+         // ctx.save();
+         // ctx.fillStyle = 'green';
+         // ctx.fillRect(char.x, char.y, metrics.width, 18);
+         // ctx.restore();
+         // renderer.render(mainChars, charIdx, charIdx + 1);
+
+         // const shadowIdx = char.shadowIndex;
+         // const shadowChar = shadowChars[shadowIdx];
+         // ctx.save();
+         // ctx.translate(600, 0);
+         // ctx.save();
+         // ctx.fillStyle = 'orange';
+         // ctx.fillRect(shadowChar.x, shadowChar.y, metrics.width, 18);
+         // ctx.restore();
+         // renderer.render(shadowChars, shadowIdx, shadowIdx + 1);
+         // ctx.restore();
        };
 
        
        function easeInOutCubic(x) {
          return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-       }
-       function easeInOutElastic(x) {
-         const c5 = (2 * Math.PI) / 4.5;
-
-         return x === 0
-              ? 0
-              : x === 1
-              ? 1
-              : x < 0.5
-                  ? -(Math.pow(2, 20 * x - 10) * Math.sin((20 * x - 11.125) * c5)) / 2
-                  : (Math.pow(2, -20 * x + 10) * Math.sin((20 * x - 11.125) * c5)) / 2 + 1;
        }
        function runAnimation(fn, duration) {
          let t0 = performance.now();
@@ -218,7 +225,9 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
              char.x = animate(fix(char.x), shadowChar.x);
              char.y = animate(fix(char.y), shadowChar.y);
            }
+
            ctx.clearRect(0, 0, 1000, 1000);
+
            renderer.render(mainChars, 0, mainChars.length - 1, false);
 
            for (let createChars of createCharRuns) {
@@ -244,32 +253,19 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
            renderer.render(mainChars, 0, mainChars.length - 1, false);
          }, 1000);
        };
-       // 
-       //        canvas.onmouseup = function(e) {
-       //          let duration = 1; // in seconds
-       //          let t = 0;
-       //          const interval = setInterval(function() {
-       //            ctx.clearRect(0, 0, 1000, 1000);
-       //            renderer.render(mainChars, 0, mainChars.length - 1, true);
-       //            
-       //            for (let char of mainChars) {
-       //              char.ox = char.x; char.oy = char.y
-       //              char.x = char.ox* (easeInOutCubic(t/duration)) + shadowChars[char.shadowIndex].x * (1-easeInOutCubic(t/duration));
-       //              char.y = char.oy* (easeInOutCubic(t/duration)) + shadowChars[char.shadowIndex].y * (1-easeInOutCubic(t/duration));
-       //            }
-       // 
-       //            ctx.clearRect(0, 0, 1000, 1000);
-       //            renderer.render(mainChars, 0, mainChars.length - 1, false);
-       // 
-       //            t += 10 * 0.001;
-       //            if (t >= duration) {
-       //              clearInterval(interval);
-       //            }
-       //          }, 10);
-       //        };
 
        return {
          render(chars, startIdx = 0, endIdx = chars.length - 1, computePositions = true) {
+           for (let [spanStart, spanEnd] of (chars.spans || [])) {
+             for (let i = spanStart; i <= spanEnd; i++) {
+               const char = chars[i];
+               ctx.save();
+               ctx.fillStyle = 'pink';
+               ctx.fillRect(char.x, char.y, 10, 10);
+               ctx.restore();
+             }
+           }
+
            let {x, y} = chars[startIdx];
            for (let i = startIdx; i <= endIdx; i++) {
              const char = chars[i];
@@ -291,6 +287,16 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
 
      const mainChars = mainText.split('').map(c => ({c, x: 0, y: 0}));
      renderer.render(mainChars);
+
+     mainChars.spans = spanSearch('exchange_json');
+     function spanSearch(s) {
+       const re = new RegExp(s, 'g');
+       const spans = [];
+       while (re.exec(mainText)) {
+         spans.push([re.lastIndex - s.length, re.lastIndex - 1]);
+       }
+       return spans;
+     }
 
      const shadowChars = shadowText.split('').map(c => ({c, x: 0, y: 0}));
      renderer.ctx.save();
@@ -315,7 +321,6 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        } else if (kind === -1) {
          let textEnd = i + text.length;
          while (i < textEnd) {
-           // mainChars[i].style.backgroundColor = 'red';
            mainChars[i].shadowIndex = 0;
            i++;
          }
@@ -324,11 +329,6 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
          const createChars = [];
          let textEnd = shadowI + text.length;
          while (shadowI < textEnd) {
-           // const span = shadowChars[shadowI].cloneNode(true);
-           // span.style.position = 'absolute';
-           // span.style.top = shadowChars[shadowI].offsetTop;
-           // span.style.left = shadowChars[shadowI].offsetLeft;
-           // creation.appendChild(span);
            createChars.push({...shadowChars[shadowI]})
            shadowI++;
          }
