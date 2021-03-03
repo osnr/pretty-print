@@ -232,18 +232,17 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
            renderer.render(mainChars);
 
            for (let createChars of createCharRuns) {
-             createChars.forEach(char => { char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1)})` });
+             createChars.forEach(char => {
+               char.bgStyle = `rgba(255, 192, 203, ${animate(0, 1)})`;
+               char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1)})`;
+             });
              renderer.render(createChars);
            }
          }, 500);
        };
        canvas.onmouseup = function(e) {
          runAnimation((fix, animate) => {
-           // just to recompute positions.
-           ctx.clearRect(0, 0, 1000, 1000);
-
            computePositions(mainChars);
-           renderer.render(mainChars);
            
            for (let char of mainChars) {
              if ('shadowIndex' in char) {
@@ -258,7 +257,10 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
            renderer.render(mainChars);
 
            for (let createChars of createCharRuns) {
-             createChars.forEach(char => { char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0)})` });
+             createChars.forEach(char => {
+               char.bgStyle = `rgba(255, 192, 203, ${animate(1, 0)})`;
+               char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0)})`;
+             });
              renderer.render(createChars);
            }
          }, 1000);
@@ -293,6 +295,12 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
 
            for (let i = startIdx; i <= endIdx; i++) {
              const char = chars[i];
+             if (char.bgStyle) {
+               ctx.save();
+               ctx.fillStyle = char.bgStyle;
+               ctx.fillRect(char.x, char.y, metrics.width, 18);
+               ctx.restore();
+             }
              ctx.fillStyle = char.fillStyle || 'black';
              ctx.fillText(char.c, char.x, char.y);
            }
@@ -317,10 +325,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
      renderer.render(mainChars);
 
      const shadowChars = shadowText.split('').map(c => ({c, x: 0, y: 0}));
-     renderer.ctx.save();
-     renderer.ctx.translate(600, 0);
-     renderer.render(shadowChars);
-     renderer.ctx.restore();
+     renderer.computePositions(shadowChars);
 
      const differ = new diff_match_patch();
      const diffs = differ.diff_main(mainText, shadowText);
