@@ -261,7 +261,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
                const char = chars[i];
                ctx.save();
                ctx.fillStyle = 'pink';
-               ctx.fillRect(char.x, char.y, 10, 10);
+               ctx.fillRect(char.x, char.y, 10, 18);
                ctx.restore();
              }
            }
@@ -286,7 +286,6 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
      })();
 
      const mainChars = mainText.split('').map(c => ({c, x: 0, y: 0}));
-     renderer.render(mainChars);
 
      mainChars.spans = spanSearch('exchange_json');
      function spanSearch(s) {
@@ -297,6 +296,9 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        }
        return spans;
      }
+
+     renderer.render(mainChars);
+
 
      const shadowChars = shadowText.split('').map(c => ({c, x: 0, y: 0}));
      renderer.ctx.save();
