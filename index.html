@@ -162,8 +162,8 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
          ctx.clearRect(0, 0, 1000, 1000);
          
          document.body.style.cursor = (function() {
-           for (let [spanStart, spanEnd] of mainChars.spans) {
-             if (spanStart <= charIdx && charIdx <= spanEnd) {
+           for (let {start, end} of mainChars.spans) {
+             if (start <= charIdx && charIdx <= end) {
                return 'pointer';
              }
            }
@@ -233,14 +233,14 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
 
            for (let createChars of createCharRuns) {
              createChars.forEach(char => {
-               char.bgStyle = `rgba(255, 192, 203, ${animate(0, 1)})`;
+               // char.bgStyle = `rgba(255, 192, 203, ${animate(0, 1)})`;
                char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1)})`;
              });
              renderer.render(createChars);
            }
          }, 500);
        };
-       canvas.onmouseup = function(e) {
+       document.onmouseup = function(e) {
          runAnimation((fix, animate) => {
            computePositions(mainChars);
            
@@ -258,7 +258,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
 
            for (let createChars of createCharRuns) {
              createChars.forEach(char => {
-               char.bgStyle = `rgba(255, 192, 203, ${animate(1, 0)})`;
+               // char.bgStyle = `rgba(255, 192, 203, ${animate(1, 0)})`;
                char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0)})`;
              });
              renderer.render(createChars);
@@ -283,11 +283,11 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        return {
          computePositions,
          render(chars, startIdx = 0, endIdx = chars.length - 1) {
-           for (let [spanStart, spanEnd] of (chars.spans || [])) {
-             for (let i = spanStart; i <= spanEnd; i++) {
+           for (let {start, end, fillStyle} of (chars.spans || [])) {
+             for (let i = start; i <= end; i++) {
                const char = chars[i];
                ctx.save();
-               ctx.fillStyle = 'pink';
+               ctx.fillStyle = fillStyle;
                ctx.fillRect(char.x, char.y, 10, 18);
                ctx.restore();
              }
@@ -316,7 +316,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        const re = new RegExp(s, 'g');
        const spans = [];
        while (re.exec(mainText)) {
-         spans.push([re.lastIndex - s.length, re.lastIndex - 1]);
+         spans.push({ start: re.lastIndex - s.length, end: re.lastIndex - 1, fillStyle: 'pink' });
        }
        return spans;
      }
