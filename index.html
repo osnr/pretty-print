@@ -154,17 +154,13 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
          }
        }
 
-       function renderSpans() {
-         // colored halos
-       }
-
        canvas.onmousemove = function(e) {
          const charIdx = charIndexUnder(e.offsetX, e.offsetY);
          const char = mainChars[charIdx];
          if (!char) return;
 
          ctx.clearRect(0, 0, 1000, 1000);
-
+         
          document.body.style.cursor = (function() {
            for (let [spanStart, spanEnd] of mainChars.spans) {
              if (spanStart <= charIdx && charIdx <= spanEnd) {
@@ -173,8 +169,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
            }
            return 'auto';
          })();
-
-         renderSpans();
+         
          renderer.render(mainChars);
 
          // ctx.save();
@@ -219,22 +214,26 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        }
 
        canvas.onmousedown = function(e) {
+         canvas.oldonmousemove = canvas.onmousemove;
+         canvas.onmousemove = null;
          runAnimation((fix, animate) => {
            for (let char of mainChars) {
-             const shadowChar = shadowChars[char.shadowIndex];
-             char.x = animate(fix(char.x), shadowChar.x);
-             char.y = animate(fix(char.y), shadowChar.y);
+             if ('shadowIndex' in char) {
+               const shadowChar = shadowChars[char.shadowIndex];
+               char.x = animate(fix(char.x), shadowChar.x);
+               char.y = animate(fix(char.y), shadowChar.y);
+             } else {
+               char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0)})`;
+             }
            }
 
            ctx.clearRect(0, 0, 1000, 1000);
 
-           renderer.render(mainChars, 0, mainChars.length - 1, false);
+           renderer.render(mainChars);
 
            for (let createChars of createCharRuns) {
-             ctx.save();
-             ctx.fillStyle = `rgba(0, 0, 0, ${animate(0, 1)})`;
-             renderer.render(createChars, 0, createChars.length - 1, false);
-             ctx.restore();
+             createChars.forEach(char => { char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1)})` });
+             renderer.render(createChars);
            }
          }, 500);
        };
@@ -242,20 +241,46 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
          runAnimation((fix, animate) => {
            // just to recompute positions.
            ctx.clearRect(0, 0, 1000, 1000);
-           renderer.render(mainChars, 0, mainChars.length - 1, true);
+
+           computePositions(mainChars);
+           renderer.render(mainChars);
            
            for (let char of mainChars) {
-             const shadowChar = shadowChars[char.shadowIndex];
-             char.x = animate(shadowChar.x, fix(char.x));
-             char.y = animate(shadowChar.y, fix(char.y));
+             if ('shadowIndex' in char) {
+               const shadowChar = shadowChars[char.shadowIndex];
+               char.x = animate(shadowChar.x, fix(char.x));
+               char.y = animate(shadowChar.y, fix(char.y));
+             } else {
+               char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1)})`;
+             }
            }
            ctx.clearRect(0, 0, 1000, 1000);
-           renderer.render(mainChars, 0, mainChars.length - 1, false);
+           renderer.render(mainChars);
+
+           for (let createChars of createCharRuns) {
+             createChars.forEach(char => { char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0)})` });
+             renderer.render(createChars);
+           }
          }, 1000);
+         setTimeout(() => { canvas.onmousemove = canvas.oldonmousemove; }, 1000);
        };
 
+       function computePositions(chars) {
+         let {x, y} = chars[0];
+         for (let char of chars) {
+           char.x = x; char.y = y;
+           if (char.c === '\n') {
+             x = 0;
+             y += 18;
+           } else {
+             x += metrics.width;
+           }
+         }
+       }
+
        return {
-         render(chars, startIdx = 0, endIdx = chars.length - 1, computePositions = true) {
+         computePositions,
+         render(chars, startIdx = 0, endIdx = chars.length - 1) {
            for (let [spanStart, spanEnd] of (chars.spans || [])) {
              for (let i = spanStart; i <= spanEnd; i++) {
                const char = chars[i];
@@ -266,19 +291,10 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
              }
            }
 
-           let {x, y} = chars[startIdx];
            for (let i = startIdx; i <= endIdx; i++) {
              const char = chars[i];
-
-             if (computePositions) { char.x = x; char.y = y; }
+             ctx.fillStyle = char.fillStyle || 'black';
              ctx.fillText(char.c, char.x, char.y);
-
-             if (char.c === '\n') {
-               x = 0;
-               y += 18;
-             } else {
-               x += metrics.width;
-             }
            }
          },
          ctx
@@ -287,7 +303,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
 
      const mainChars = mainText.split('').map(c => ({c, x: 0, y: 0}));
 
-     mainChars.spans = spanSearch('exchange_json');
+     mainChars.spans = spanSearch('exchange_json').slice(1);
      function spanSearch(s) {
        const re = new RegExp(s, 'g');
        const spans = [];
@@ -297,8 +313,8 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        return spans;
      }
 
+     renderer.computePositions(mainChars);
      renderer.render(mainChars);
-
 
      const shadowChars = shadowText.split('').map(c => ({c, x: 0, y: 0}));
      renderer.ctx.save();
@@ -323,7 +339,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        } else if (kind === -1) {
          let textEnd = i + text.length;
          while (i < textEnd) {
-           mainChars[i].shadowIndex = 0;
+           // mainChars[i].shadowIndex = 0;
            i++;
          }
          
