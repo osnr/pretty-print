@@ -26,7 +26,7 @@
     <canvas width="800" height="1000" id="canv"></canvas>
 
     <script>
-     const mainText = `
+     let mainText = `
 #define exchange_json(datap, sizep, keys_fmt, ...) \\
     do { \\
         unsigned int id = (uintptr_t)pthread_self(); \\
@@ -73,7 +73,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
 }
      `.trim();
 
-     const shadowText = `
+     let shadowText = `
 #define exchange_json(datap, sizep, keys_fmt, ...) \\
     do { \\
         unsigned int id = (uintptr_t)pthread_self(); \\
@@ -122,6 +122,35 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
 
     return 0;
 }`.trim();
+
+     let obj = {"widget": {
+    "debug": "on",
+    "window": {
+        "title": "Sample Konfabulator Widget",
+        "name": "main_window",
+        "width": 500,
+        "height": 500
+    },
+    "image": { 
+        "src": "Images/Sun.png",
+        "name": "sun1",
+        "hOffset": 250,
+        "vOffset": 250,
+        "alignment": "center"
+    },
+    "text": {
+        "data": "Click Here",
+        "size": 36,
+        "style": "bold",
+        "name": "text1",
+        "hOffset": 250,
+        "vOffset": 100,
+        "alignment": "center",
+        "onMouseUp": "sun1.opacity = (sun1.opacity / 100) * 90;"
+    }
+}}    ;
+     mainText = JSON.stringify(obj);
+     shadowText = JSON.stringify(obj, null, 2);
 
      const renderer = (function() {
        function setDPI(canvas, dpi) {
@@ -216,7 +245,22 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        canvas.onmousedown = function(e) {
          canvas.oldonmousemove = canvas.onmousemove;
          canvas.onmousemove = null;
+
+         if (mainChars.spans && mainChars.spans[0]) {
+           mainChars.spans[0].fillStyle = 'rgba(0,0,0,0)';
+         }
          runAnimation((fix, animate) => {
+           if (mainChars.spans && mainChars.spans[0]) {
+             const span = mainChars.spans[0];
+             ctx.save();
+             ctx.fillStyle = 'orange';
+             const [startChar, endChar] = [mainChars[span.start], mainChars[span.end]];
+             ctx.fillRect(startChar.x, startChar.y, endChar.x - startChar.x, endChar.y - startChar.y);
+             ctx.fillRect(0, 0, 100, 100);
+             console.log(startChar.x, startChar.y, endChar.x - startChar.x, endChar.y - startChar.y);
+             ctx.restore();
+           }
+
            for (let char of mainChars) {
              if ('shadowIndex' in char) {
                const shadowChar = shadowChars[char.shadowIndex];
@@ -240,7 +284,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
            }
          }, 500);
        };
-       document.onmouseup = function(e) {
+       document.onmouseup = function(e) {         
          runAnimation((fix, animate) => {
            computePositions(mainChars);
            
@@ -264,14 +308,19 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
              renderer.render(createChars);
            }
          }, 1000);
-         setTimeout(() => { canvas.onmousemove = canvas.oldonmousemove; }, 1000);
+         setTimeout(() => {
+           canvas.onmousemove = canvas.oldonmousemove;
+           if (mainChars.spans && mainChars.spans[0]) {
+             mainChars.spans[0].fillStyle = 'pink';
+           }
+         }, 1000);
        };
 
        function computePositions(chars) {
          let {x, y} = chars[0];
          for (let char of chars) {
            char.x = x; char.y = y;
-           if (char.c === '\n') {
+           if (char.c === '\n' || char.x > 700) {
              x = 0;
              y += 18;
            } else {
@@ -329,7 +378,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
 
      const differ = new diff_match_patch();
      const diffs = differ.diff_main(mainText, shadowText);
-     differ.diff_cleanupSemantic(diffs);
+     // differ.diff_cleanupSemantic(diffs);
      console.log(diffs);
 
      let i = 0, shadowI = 0;
