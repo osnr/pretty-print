@@ -123,32 +123,30 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
     return 0;
 }`.trim();
 
-     let obj = {"widget": {
-    "debug": "on",
-    "window": {
-        "title": "Sample Konfabulator Widget",
-        "name": "main_window",
-        "width": 500,
-        "height": 500
-    },
-    "image": { 
-        "src": "Images/Sun.png",
-        "name": "sun1",
-        "hOffset": 250,
-        "vOffset": 250,
-        "alignment": "center"
-    },
-    "text": {
-        "data": "Click Here",
-        "size": 36,
-        "style": "bold",
-        "name": "text1",
-        "hOffset": 250,
-        "vOffset": 100,
-        "alignment": "center",
-        "onMouseUp": "sun1.opacity = (sun1.opacity / 100) * 90;"
+     let obj = {
+  "manifest_version": 2,
+
+  "name": "TabFS",
+  "description": "Mount your browser tabs as a filesystem",
+  "version": "1.0",
+
+  "permissions": [
+    "tabs", "tabCapture", "debugger", "nativeMessaging", "management",
+    "unlimitedStorage",
+    "<all_urls>"
+  ],
+
+  "background": {
+    "scripts": ["vendor/browser-polyfill.js", "background.js"],
+    "persistent": true
+  },
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "tabfs@rsnous.com"
     }
-}}    ;
+  }
+};
      mainText = JSON.stringify(obj);
      shadowText = JSON.stringify(obj, null, 2);
 
@@ -186,18 +184,18 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        canvas.onmousemove = function(e) {
          const charIdx = charIndexUnder(e.offsetX, e.offsetY);
          const char = mainChars[charIdx];
-         if (!char) return;
+         if (!char) { document.body.style.cursor = 'auto'; return; }
 
          ctx.clearRect(0, 0, 1000, 1000);
          
-         document.body.style.cursor = (function() {
-           for (let {start, end} of mainChars.spans) {
-             if (start <= charIdx && charIdx <= end) {
-               return 'pointer';
-             }
-           }
-           return 'auto';
-         })();
+         document.body.style.cursor = 'pointer';// (function() {
+           //            for (let {start, end} of mainChars.spans) {
+           //              if (start <= charIdx && charIdx <= end) {
+           //                return 'pointer';
+           //              }
+           //            }
+           //            return 'auto';
+           //          })();
          
          renderer.render(mainChars);
 
@@ -282,7 +280,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
              });
              renderer.render(createChars);
            }
-         }, 500);
+         }, e.shiftKey ? 2000 : 500);
        };
        document.onmouseup = function(e) {         
          runAnimation((fix, animate) => {
