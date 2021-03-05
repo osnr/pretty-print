@@ -1,21 +1,8 @@
 <html>
   <head>
-    <link rel="stylesheet"
-      href="vendor/default.min.css">
-    <script src="vendor/highlight.min.js"></script>
-
     <script src="vendor/diff_match_patch.js"></script>
 
     <style>
-     code { font-family: Operator Mono SSm, monospace; position: relative; }
-     #shadow { position: absolute; right: 0; top: 0; }
-
-     .character { display: inline-block; transition: transform 1s ease-in-out; }
-     .macro .character { background-color: pink; outline: 1px solid pink; }
-     .macro:hover .character { background-color: orange; outline: 1px solid orange; }
-     
-     .highlighted-shadow-char { outline: 1px solid orange; }
-
      #canv { position: absolute; left: 0; top: 0; outline: 1px solid red; }
 
      body { margin: 0; }
@@ -26,103 +13,6 @@
     <canvas width="800" height="1000" id="canv"></canvas>
 
     <script>
-     let mainText = `
-#define exchange_json(datap, sizep, keys_fmt, ...) \\
-    do { \\
-        unsigned int id = (uintptr_t)pthread_self(); \\
-        int req_rv = do_exchange(id, datap, sizep, \\
-            "{id: %u, " keys_fmt "}", \\
-            id, ##__VA_ARGS__); \\
-        if (req_rv != 0) return req_rv; \\
-    } while (0)
-
-#define parse_and_free_response(data, size, keys_fmt, ...) \\
-    do { \\
-        if (*keys_fmt == '\\0') { \\
-            /* empty format string, skip the work */ \\
-            free(data); data = NULL; \\
-        } else { \\
-            int num_expected = count_fmt_args(keys_fmt); \\
-            int num_scanned = json_scanf(data, size, \\
-                "{" keys_fmt "}", \\
-                ##__VA_ARGS__); \\
-            if (num_scanned == num_expected) { \\
-                free(data); data = NULL; \\
-            } else { \\
-                eprintln("%s: could only parse %d of %d keys!", \\
-                    __func__, num_expected, num_scanned); \\
-                free(data); data = NULL; \\
-                return -EIO; \\
-            } \\
-        } \\
-    } while (0)
-
-static int tabfs_getattr(const char *path, struct stat *stbuf) {
-    char *rdata;
-    size_t rsize;
-    exchange_json(&rdata, &rsize,
-        "op: %Q, path: %Q",
-        "getattr", path);
-
-    memset(stbuf, 0, sizeof(struct stat));
-    parse_and_free_response(rdata, rsize,
-        "st_mode: %d, st_nlink: %d, st_size: %d",
-        &stbuf->st_mode, &stbuf->st_nlink, &stbuf->st_size);
-
-    return 0;
-}
-     `.trim();
-
-     let shadowText = `
-#define exchange_json(datap, sizep, keys_fmt, ...) \\
-    do { \\
-        unsigned int id = (uintptr_t)pthread_self(); \\
-        int req_rv = do_exchange(id, datap, sizep, \\
-            "{id: %u, " keys_fmt "}", \\
-            id, ##__VA_ARGS__); \\
-        if (req_rv != 0) return req_rv; \\
-    } while (0)
-
-#define parse_and_free_response(data, size, keys_fmt, ...) \\
-    do { \\
-        if (*keys_fmt == '\\0') { \\
-            /* empty format string, skip the work */ \\
-            free(data); data = NULL; \\
-        } else { \\
-            int num_expected = count_fmt_args(keys_fmt); \\
-            int num_scanned = json_scanf(data, size, \\
-                "{" keys_fmt "}", \\
-                ##__VA_ARGS__); \\
-            if (num_scanned == num_expected) { \\
-                free(data); data = NULL; \\
-            } else { \\
-                eprintln("%s: could only parse %d of %d keys!", \\
-                    __func__, num_expected, num_scanned); \\
-                free(data); data = NULL; \\
-                return -EIO; \\
-            } \\
-        } \\
-    } while (0)
-
-static int tabfs_getattr(const char *path, struct stat *stbuf) {
-    char *rdata;
-    size_t rsize;
-    do { \\
-        unsigned int id = (uintptr_t)pthread_self(); \\
-        int req_rv = do_exchange(id, &rdata, &rsize, \\
-            "{id: %u, " "op: %Q, path: %Q" "}", \\
-            id, "getattr", path); \\
-        if (req_rv != 0) return req_rv; \\
-    } while (0);
-
-    memset(stbuf, 0, sizeof(struct stat));
-    parse_and_free_response(rdata, rsize,
-        "st_mode: %d, st_nlink: %d, st_size: %d",
-        &stbuf->st_mode, &stbuf->st_nlink, &stbuf->st_size);
-
-    return 0;
-}`.trim();
-
      let obj = {
   "manifest_version": 2,
 
@@ -147,8 +37,8 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
     }
   }
 };
-     mainText = JSON.stringify(obj);
-     shadowText = JSON.stringify(obj, null, 2);
+     let mainText = JSON.stringify(obj);
+     let shadowText = JSON.stringify(obj, null, 2);
 
      const renderer = (function() {
        function setDPI(canvas, dpi) {
@@ -171,11 +61,12 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        ctx.textBaseline = 'top';
        ctx.font = '1em Operator Mono SSm, monospace';
        const metrics = ctx.measureText('m');
+       console.log(metrics);
 
        function charIndexUnder(x, y) {
          for (let [i, char] of mainChars.entries()) {
            if (char.x < x && char.y < y &&
-               x < char.x + metrics.width && y < char.y + 18) {
+               x < char.x + metrics.width && y < char.y + metrics.emHeightDescent) {
              return i;
            }
          }
@@ -188,36 +79,11 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
 
          ctx.clearRect(0, 0, 1000, 1000);
          
-         document.body.style.cursor = 'pointer';// (function() {
-           //            for (let {start, end} of mainChars.spans) {
-           //              if (start <= charIdx && charIdx <= end) {
-           //                return 'pointer';
-           //              }
-           //            }
-           //            return 'auto';
-           //          })();
+         document.body.style.cursor = 'pointer';
          
          renderer.render(mainChars);
-
-         // ctx.save();
-         // ctx.fillStyle = 'green';
-         // ctx.fillRect(char.x, char.y, metrics.width, 18);
-         // ctx.restore();
-         // renderer.render(mainChars, charIdx, charIdx + 1);
-
-         // const shadowIdx = char.shadowIndex;
-         // const shadowChar = shadowChars[shadowIdx];
-         // ctx.save();
-         // ctx.translate(600, 0);
-         // ctx.save();
-         // ctx.fillStyle = 'orange';
-         // ctx.fillRect(shadowChar.x, shadowChar.y, metrics.width, 18);
-         // ctx.restore();
-         // renderer.render(shadowChars, shadowIdx, shadowIdx + 1);
-         // ctx.restore();
        };
 
-       
        function easeInOutCubic(x) {
          return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
        }
@@ -244,21 +110,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
          canvas.oldonmousemove = canvas.onmousemove;
          canvas.onmousemove = null;
 
-         if (mainChars.spans && mainChars.spans[0]) {
-           mainChars.spans[0].fillStyle = 'rgba(0,0,0,0)';
-         }
          runAnimation((fix, animate) => {
-           if (mainChars.spans && mainChars.spans[0]) {
-             const span = mainChars.spans[0];
-             ctx.save();
-             ctx.fillStyle = 'orange';
-             const [startChar, endChar] = [mainChars[span.start], mainChars[span.end]];
-             ctx.fillRect(startChar.x, startChar.y, endChar.x - startChar.x, endChar.y - startChar.y);
-             ctx.fillRect(0, 0, 100, 100);
-             console.log(startChar.x, startChar.y, endChar.x - startChar.x, endChar.y - startChar.y);
-             ctx.restore();
-           }
-
            for (let char of mainChars) {
              if ('shadowIndex' in char) {
                const shadowChar = shadowChars[char.shadowIndex];
@@ -275,7 +127,6 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
 
            for (let createChars of createCharRuns) {
              createChars.forEach(char => {
-               // char.bgStyle = `rgba(255, 192, 203, ${animate(0, 1)})`;
                char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1)})`;
              });
              renderer.render(createChars);
@@ -300,7 +151,6 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
 
            for (let createChars of createCharRuns) {
              createChars.forEach(char => {
-               // char.bgStyle = `rgba(255, 192, 203, ${animate(1, 0)})`;
                char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0)})`;
              });
              renderer.render(createChars);
@@ -308,9 +158,6 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
          }, 1000);
          setTimeout(() => {
            canvas.onmousemove = canvas.oldonmousemove;
-           if (mainChars.spans && mainChars.spans[0]) {
-             mainChars.spans[0].fillStyle = 'pink';
-           }
          }, 1000);
        };
 
@@ -320,7 +167,7 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
            char.x = x; char.y = y;
            if (char.c === '\n' || char.x > 700) {
              x = 0;
-             y += 18;
+             y += metrics.emHeightDescent;
            } else {
              x += metrics.width;
            }
@@ -330,25 +177,8 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        return {
          computePositions,
          render(chars, startIdx = 0, endIdx = chars.length - 1) {
-           for (let {start, end, fillStyle} of (chars.spans || [])) {
-             for (let i = start; i <= end; i++) {
-               const char = chars[i];
-               ctx.save();
-               ctx.fillStyle = fillStyle;
-               ctx.fillRect(char.x, char.y, 10, 18);
-               ctx.restore();
-             }
-           }
-
            for (let i = startIdx; i <= endIdx; i++) {
              const char = chars[i];
-             if (char.bgStyle) {
-               ctx.save();
-               ctx.fillStyle = char.bgStyle;
-               ctx.fillRect(char.x, char.y, metrics.width, 18);
-               ctx.restore();
-             }
-             ctx.fillStyle = char.fillStyle || 'black';
              ctx.fillText(char.c, char.x, char.y);
            }
          },
@@ -357,17 +187,6 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
      })();
 
      const mainChars = mainText.split('').map(c => ({c, x: 0, y: 0}));
-
-     mainChars.spans = spanSearch('exchange_json').slice(1);
-     function spanSearch(s) {
-       const re = new RegExp(s, 'g');
-       const spans = [];
-       while (re.exec(mainText)) {
-         spans.push({ start: re.lastIndex - s.length, end: re.lastIndex - 1, fillStyle: 'pink' });
-       }
-       return spans;
-     }
-
      renderer.computePositions(mainChars);
      renderer.render(mainChars);
 
@@ -391,7 +210,6 @@ static int tabfs_getattr(const char *path, struct stat *stbuf) {
        } else if (kind === -1) {
          let textEnd = i + text.length;
          while (i < textEnd) {
-           // mainChars[i].shadowIndex = 0;
            i++;
          }
          
