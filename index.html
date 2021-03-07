@@ -101,12 +101,6 @@
        });
 
        const renderFrame = (function() {
-         let fixKey = 0; let fixed = {}; function fix(x) {
-           if (fixKey in fixed) { x = fixed[fixKey]; }
-           else { fixed[fixKey] = x; }
-           fixKey++; return x;
-         }
-
          function easeInOutCubic(x) {
            return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
          }
@@ -119,8 +113,8 @@
            for (let char of mainChars) {
              if ('shadowIndex' in char) {
                const shadowChar = shadowChars[char.shadowIndex];
-               char.x = animate(fix(char.x), shadowChar.x, t);
-               char.y = animate(fix(char.y), shadowChar.y, t);
+               char.animX = animate(char.x, shadowChar.x, t);
+               char.animY = animate(char.y, shadowChar.y, t);
              } else {
                char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0, t)})`;
              }
@@ -145,43 +139,6 @@
 
        canvas.onmousedown = function(e) { retargetAnimation(1); };
        canvas.onmouseup = function(e) { retargetAnimation(0); };
-       // 
-       //        canvas.onmousedown = function(e) {
-       //          canvas.oldonmousemove = canvas.onmousemove;
-       //          canvas.onmousemove = null;
-       // 
-       //          runAnimation((fix, animate) => {
-       // 
-       //          }, e.shiftKey ? 2000 : 500);
-       //        };
-       //        document.onmouseup = function(e) {
-       //          cancel = true;
-       //          runAnimation((fix, animate) => {
-       //            computePositions(mainChars);
-       //            
-       //            for (let char of mainChars) {
-       //              if ('shadowIndex' in char) {
-       //                const shadowChar = shadowChars[char.shadowIndex];
-       //                char.x = animate(shadowChar.x, fix(char.x));
-       //                char.y = animate(shadowChar.y, fix(char.y));
-       //              } else {
-       //                char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1)})`;
-       //              }
-       //            }
-       //            ctx.clearRect(0, 0, 1000, 1000);
-       //            renderer.render(mainChars);
-       // 
-       //            for (let createChars of createCharRuns) {
-       //              createChars.forEach(char => {
-       //                char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0)})`;
-       //              });
-       //              renderer.render(createChars);
-       //            }
-       //          }, 1000);
-       //          setTimeout(() => {
-       //            canvas.onmousemove = canvas.oldonmousemove;
-       //          }, 1000);
-       //        };
 
        function computePositions(chars) {
          let {x, y} = chars[0];
@@ -201,7 +158,9 @@
          render(chars, startIdx = 0, endIdx = chars.length - 1) {
            for (let i = startIdx; i <= endIdx; i++) {
              const char = chars[i];
-             ctx.fillText(char.c, char.x, char.y);
+             ctx.fillText(char.c,
+                          'animX' in char ? char.animX : char.x,
+                          'animY' in char ? char.animY : char.y);
            }
          },
          ctx
