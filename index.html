@@ -61,7 +61,6 @@
        ctx.textBaseline = 'top';
        ctx.font = '1em Operator Mono SSm, monospace';
        const metrics = ctx.measureText('m');
-       console.log(metrics);
 
        function charIndexUnder(x, y) {
          for (let [i, char] of mainChars.entries()) {
@@ -77,47 +76,53 @@
          const char = mainChars[charIdx];
          if (!char) { document.body.style.cursor = 'auto'; return; }
 
-         ctx.clearRect(0, 0, 1000, 1000);
-         
          document.body.style.cursor = 'pointer';
-         
-         renderer.render(mainChars);
        };
 
-       function easeInOutCubic(x) {
-         return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-       }
-       function runAnimation(fn, duration) {
-         let t0 = performance.now();
-         let fixed = {};
-         requestAnimationFrame(function frame(t) {
-           let key = 0;
-           fn(function fix(x) {
-             if (key in fixed) { x = fixed[key]; }
-             else { fixed[key] = x; }
-             key++; return x;
-           }, function animate(x0, x1, ease = easeInOutCubic) {
-             return x0 * (1 - ease((t - t0) / duration)) + x1 * ease((t - t0) / duration);
-           });
+       let t = 0, targetT = 0;
+       let prevTimestamp;
+       requestAnimationFrame(function frame(timestamp) {
+         // what is the current t? recompute
+         // when they retarget, we want to set a linear curve of 1s up to the target?
+         // (and if they hold Shift, we want to slow the curve)
+         if (targetT < t) {
+           t -= 0.1;
+           if (t < targetT) t = targetT;
 
-           if (t < t0 + duration) {
-             requestAnimationFrame(frame);
-           }
-         });
-       }
+         } else if (targetT > t) {
+           t += 0.1;
+           if (t > targetT) t = targetT;
+         }
 
-       canvas.onmousedown = function(e) {
-         canvas.oldonmousemove = canvas.onmousemove;
-         canvas.onmousemove = null;
+         renderFrame(t);
 
-         runAnimation((fix, animate) => {
+         prevTimestamp = timestamp;
+         requestAnimationFrame(frame);
+       });
+
+       const renderFrame = (function() {
+         let fixKey = 0; let fixed = {}; function fix(x) {
+           if (fixKey in fixed) { x = fixed[fixKey]; }
+           else { fixed[fixKey] = x; }
+           fixKey++; return x;
+         }
+
+         function easeInOutCubic(x) {
+           return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+         }
+
+         function animate(x0, x1, t, ease = easeInOutCubic) {
+           return x0 * (1 - ease(t)) + x1 * ease(t);
+         }
+
+         return function frame(t) {
            for (let char of mainChars) {
              if ('shadowIndex' in char) {
                const shadowChar = shadowChars[char.shadowIndex];
-               char.x = animate(fix(char.x), shadowChar.x);
-               char.y = animate(fix(char.y), shadowChar.y);
+               char.x = animate(fix(char.x), shadowChar.x, t);
+               char.y = animate(fix(char.y), shadowChar.y, t);
              } else {
-               char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0)})`;
+               char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0, t)})`;
              }
            }
 
@@ -127,39 +132,56 @@
 
            for (let createChars of createCharRuns) {
              createChars.forEach(char => {
-               char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1)})`;
+               char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1, t)})`;
              });
              renderer.render(createChars);
            }
-         }, e.shiftKey ? 2000 : 500);
-       };
-       document.onmouseup = function(e) {         
-         runAnimation((fix, animate) => {
-           computePositions(mainChars);
-           
-           for (let char of mainChars) {
-             if ('shadowIndex' in char) {
-               const shadowChar = shadowChars[char.shadowIndex];
-               char.x = animate(shadowChar.x, fix(char.x));
-               char.y = animate(shadowChar.y, fix(char.y));
-             } else {
-               char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1)})`;
-             }
-           }
-           ctx.clearRect(0, 0, 1000, 1000);
-           renderer.render(mainChars);
+         };
+       })();
 
-           for (let createChars of createCharRuns) {
-             createChars.forEach(char => {
-               char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0)})`;
-             });
-             renderer.render(createChars);
-           }
-         }, 1000);
-         setTimeout(() => {
-           canvas.onmousemove = canvas.oldonmousemove;
-         }, 1000);
-       };
+       function retargetAnimation(t) {
+         targetT = t;
+       }
+
+       canvas.onmousedown = function(e) { retargetAnimation(1); };
+       canvas.onmouseup = function(e) { retargetAnimation(0); };
+       // 
+       //        canvas.onmousedown = function(e) {
+       //          canvas.oldonmousemove = canvas.onmousemove;
+       //          canvas.onmousemove = null;
+       // 
+       //          runAnimation((fix, animate) => {
+       // 
+       //          }, e.shiftKey ? 2000 : 500);
+       //        };
+       //        document.onmouseup = function(e) {
+       //          cancel = true;
+       //          runAnimation((fix, animate) => {
+       //            computePositions(mainChars);
+       //            
+       //            for (let char of mainChars) {
+       //              if ('shadowIndex' in char) {
+       //                const shadowChar = shadowChars[char.shadowIndex];
+       //                char.x = animate(shadowChar.x, fix(char.x));
+       //                char.y = animate(shadowChar.y, fix(char.y));
+       //              } else {
+       //                char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1)})`;
+       //              }
+       //            }
+       //            ctx.clearRect(0, 0, 1000, 1000);
+       //            renderer.render(mainChars);
+       // 
+       //            for (let createChars of createCharRuns) {
+       //              createChars.forEach(char => {
+       //                char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0)})`;
+       //              });
+       //              renderer.render(createChars);
+       //            }
+       //          }, 1000);
+       //          setTimeout(() => {
+       //            canvas.onmousemove = canvas.oldonmousemove;
+       //          }, 1000);
+       //        };
 
        function computePositions(chars) {
          let {x, y} = chars[0];
