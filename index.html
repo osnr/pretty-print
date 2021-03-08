@@ -82,6 +82,7 @@
          ctx.textBaseline = 'top';
          ctx.font = '1em Operator Mono SSm, monospace';
          const metrics = ctx.measureText('m');
+         const lineHeight = metrics.fontBoundingBoxDescent + 1;
 
          return {
            computePositions(chars) {
@@ -90,7 +91,7 @@
                char.x = x; char.y = y;
                if (char.c === '\n' || char.x > 700) {
                  x = 0;
-                 y += metrics.fontBoundingBoxDescent + 1;
+                 y += lineHeight;
                } else {
                  x += metrics.width;
                }
@@ -100,7 +101,7 @@
              for (let [i, char] of mainChars.entries()) {
                if (char.x < x && char.y < y &&
                    x < char.x + metrics.width &&
-                   y < char.y + metrics.fontBoundingBoxDescent + 1) {
+                   y < char.y + lineHeight) {
                  return i;
                }
              }
@@ -109,10 +110,16 @@
            render(chars, startIdx = 0, endIdx = chars.length - 1) {
              for (let i = startIdx; i <= endIdx; i++) {
                const char = chars[i];
+               const x = "animX" in char ? char.animX : char.x;
+               const y = "animY" in char ? char.animY : char.y;
+               if (char.bgStyle) {
+                 ctx.save();
+                 ctx.fillStyle = char.bgStyle;
+                 ctx.fillRect(x, y, metrics.width, lineHeight);
+                 ctx.restore();
+               }
                ctx.fillStyle = char.fillStyle || 'black';
-               ctx.fillText(char.c,
-                            'animX' in char ? char.animX : char.x,
-                            'animY' in char ? char.animY : char.y);
+               ctx.fillText(char.c, x, y);
              }
            },
            ctx
