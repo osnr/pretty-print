@@ -138,9 +138,7 @@
 
        let t = 0;
        requestAnimationFrame(function frame(prevTimestamp, timestamp) {
-         // what is the current t? recompute
-         // when they retarget, we want to set a linear curve of 1s up to the target?
-         // (and if they hold Shift, we want to slow the curve)
+         // FIXME: make step timediff-dependent (?) it's a bit too fast atm
          if (target < t) {
            t -= slowMode ? step/2 : step;
            if (t < target) t = target;
