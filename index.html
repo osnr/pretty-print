@@ -13,7 +13,7 @@
 
   <body>
     <script>
-     let obj = {
+     const obj = {
        "manifest_version": 2,
 
        "name": "TabFS",
@@ -82,7 +82,7 @@
          ctx.textBaseline = 'top';
          ctx.font = '1em Operator Mono SSm, monospace';
          const metrics = ctx.measureText('m');
-         const lineHeight = metrics.fontBoundingBoxDescent + 1;
+         const lineHeight = metrics.actualBoundingBoxDescent * 1.4;
 
          return {
            computePositions(chars) {
@@ -191,9 +191,10 @@
        Renderer.computePositions(mainChars);
        Renderer.render(mainChars);
 
+       // creation of createCharRuns (later) requires that we compute
+       // positions for shadowChars beforehand.
        Renderer.computePositions(shadowChars);
 
-       // creation of createCharRuns requires that shadowChars have positions computed already.
        const createCharRuns = [];
        (function() { // walk the diffs to construct a mapping mainChars -> shadowChars
          let i = 0, shadowI = 0;
