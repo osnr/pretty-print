@@ -3,9 +3,9 @@
     <script src="vendor/diff_match_patch.js"></script>
 
     <style>
-     #canv { position: absolute; left: 0; top: 0; outline: 1px solid red; }
-
-     body { margin: 0; }
+     #canv { position: absolute; left: 0; top: 0; }
+ 
+     body { margin: 0; overflow: hidden; }
     </style>
   </head>
 
@@ -14,33 +14,37 @@
 
     <script>
      let obj = {
-  "manifest_version": 2,
+       "manifest_version": 2,
 
-  "name": "TabFS",
-  "description": "Mount your browser tabs as a filesystem",
-  "version": "1.0",
+       "name": "TabFS",
+       "description": "Mount your browser tabs as a filesystem",
+       "version": "1.0",
 
-  "permissions": [
-    "tabs", "tabCapture", "debugger", "nativeMessaging", "management",
-    "unlimitedStorage",
-    "<all_urls>"
-  ],
+       "permissions": [
+         "tabs", "tabCapture", "debugger", "nativeMessaging", "management",
+         "unlimitedStorage",
+         "<all_urls>"
+       ],
 
-  "background": {
-    "scripts": ["vendor/browser-polyfill.js", "background.js"],
-    "persistent": true
-  },
+       "background": {
+         "scripts": ["vendor/browser-polyfill.js", "background.js"],
+         "persistent": true
+       },
 
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "tabfs@rsnous.com"
-    }
-  }
-};
+       "browser_specific_settings": {
+         "gecko": {
+           "id": "tabfs@rsnous.com"
+         }
+       }
+     };
+     // source text (what shows up on the screen initially)
      let mainText = JSON.stringify(obj);
+     // target text (what the source text animates into when you mousedown)
      let shadowText = JSON.stringify(obj, null, 2);
 
-     const renderer = (function() {
+     const canvas = document.querySelector('canvas');
+
+     const Renderer = (function() {
        function setDPI(canvas, dpi) {
          // Set up CSS size.
          canvas.style.width = canvas.style.width || canvas.width + 'px';
@@ -53,8 +57,6 @@
          var ctx = canvas.getContext('2d');
          ctx.scale(scaleFactor, scaleFactor);
        }
-       
-       const canvas = document.querySelector('canvas');
        setDPI(canvas, 192);
 
        const ctx = canvas.getContext('2d');
@@ -62,44 +64,44 @@
        ctx.font = '1em Operator Mono SSm, monospace';
        const metrics = ctx.measureText('m');
 
-       function charIndexUnder(x, y) {
-         for (let [i, char] of mainChars.entries()) {
-           if (char.x < x && char.y < y &&
-               x < char.x + metrics.width && y < char.y + metrics.emHeightDescent) {
-             return i;
+       function computePositions(chars) {
+         let {x, y} = chars[0];
+         for (let char of chars) {
+           char.x = x; char.y = y;
+           if (char.c === '\n' || char.x > 700) {
+             x = 0;
+             y += metrics.emHeightDescent;
+           } else {
+             x += metrics.width;
            }
          }
        }
 
-       canvas.onmousemove = function(e) {
-         const charIdx = charIndexUnder(e.offsetX, e.offsetY);
-         const char = mainChars[charIdx];
-         if (!char) { document.body.style.cursor = 'auto'; return; }
-
-         document.body.style.cursor = 'pointer';
+       return {
+         computePositions,
+         charIndexUnder(x, y) {
+           for (let [i, char] of mainChars.entries()) {
+             if (char.x < x && char.y < y &&
+                 x < char.x + metrics.width &&
+                 y < char.y + metrics.emHeightDescent) {
+               return i;
+             }
+           }
+         },
+         clear() { ctx.clearRect(0, 0, 1000, 1000); },
+         render(chars, startIdx = 0, endIdx = chars.length - 1) {
+           for (let i = startIdx; i <= endIdx; i++) {
+             const char = chars[i];
+             ctx.fillText(char.c,
+                          'animX' in char ? char.animX : char.x,
+                          'animY' in char ? char.animY : char.y);
+           }
+         },
+         ctx
        };
+     })();
 
-       let t = 0, targetT = 0;
-       let prevTimestamp;
-       requestAnimationFrame(function frame(timestamp) {
-         // what is the current t? recompute
-         // when they retarget, we want to set a linear curve of 1s up to the target?
-         // (and if they hold Shift, we want to slow the curve)
-         if (targetT < t) {
-           t -= 0.1;
-           if (t < targetT) t = targetT;
-
-         } else if (targetT > t) {
-           t += 0.1;
-           if (t > targetT) t = targetT;
-         }
-
-         renderFrame(t);
-
-         prevTimestamp = timestamp;
-         requestAnimationFrame(frame);
-       });
-
+     const Animator = (function() {
        const renderFrame = (function() {
          function easeInOutCubic(x) {
            return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
@@ -120,90 +122,105 @@
              }
            }
 
-           ctx.clearRect(0, 0, 1000, 1000);
-
-           renderer.render(mainChars);
+           Renderer.clear();
+           Renderer.render(mainChars);
 
            for (let createChars of createCharRuns) {
              createChars.forEach(char => {
                char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1, t)})`;
              });
-             renderer.render(createChars);
+             Renderer.render(createChars);
            }
          };
        })();
+       
+       let target, step, slowMode;
 
-       function retargetAnimation(t) {
-         targetT = t;
-       }
+       let t = 0;
+       requestAnimationFrame(function frame(prevTimestamp, timestamp) {
+         // what is the current t? recompute
+         // when they retarget, we want to set a linear curve of 1s up to the target?
+         // (and if they hold Shift, we want to slow the curve)
+         if (target < t) {
+           t -= slowMode ? step/2 : step;
+           if (t < target) t = target;
 
-       canvas.onmousedown = function(e) { retargetAnimation(1); };
-       canvas.onmouseup = function(e) { retargetAnimation(0); };
-
-       function computePositions(chars) {
-         let {x, y} = chars[0];
-         for (let char of chars) {
-           char.x = x; char.y = y;
-           if (char.c === '\n' || char.x > 700) {
-             x = 0;
-             y += metrics.emHeightDescent;
-           } else {
-             x += metrics.width;
-           }
+         } else if (target > t) {
+           t += slowMode ? step/2 : step;
+           if (t > target) t = target;
          }
-       }
+
+         renderFrame(t);
+
+         requestAnimationFrame(newTimestamp => frame(timestamp, newTimestamp));
+       });
 
        return {
-         computePositions,
-         render(chars, startIdx = 0, endIdx = chars.length - 1) {
-           for (let i = startIdx; i <= endIdx; i++) {
-             const char = chars[i];
-             ctx.fillText(char.c,
-                          'animX' in char ? char.animX : char.x,
-                          'animY' in char ? char.animY : char.y);
-           }
+         get target() { return target; },
+         set target(t) {
+           target = t;
+           // FIXME: dynamically stop/start animation
          },
-         ctx
+         get step() { return step; },
+         set step(s) { step = s; },
+         get slowMode() { return slowMode; },
+         set slowMode(sm) { slowMode = sm; }
        };
      })();
 
      const mainChars = mainText.split('').map(c => ({c, x: 0, y: 0}));
-     renderer.computePositions(mainChars);
-     renderer.render(mainChars);
+     Renderer.computePositions(mainChars);
+     Renderer.render(mainChars);
 
      const shadowChars = shadowText.split('').map(c => ({c, x: 0, y: 0}));
-     renderer.computePositions(shadowChars);
+     Renderer.computePositions(shadowChars);
 
-     const differ = new diff_match_patch();
-     const diffs = differ.diff_main(mainText, shadowText);
-     // differ.diff_cleanupSemantic(diffs);
-     console.log(diffs);
+     const diffs = (function() {
+       const differ = new diff_match_patch();
+       const diffs = differ.diff_main(mainText, shadowText);
+       // differ.diff_cleanupSemantic(diffs);
+       return diffs;
+     })();
 
-     let i = 0, shadowI = 0;
-     const createCharRuns = [];
-     for (let {0: kind, 1: text} of diffs) {
-       if (kind === 0) {
-         let textEnd = i + text.length;
-         while (i < textEnd) {
-           mainChars[i].shadowIndex = shadowI;
-           i++; shadowI++;
+     const createCharRuns = (function() {
+       const createCharRuns = [];
+       let i = 0, shadowI = 0;
+       for (let {0: kind, 1: text} of diffs) {
+         if (kind === 0) {
+           let textEnd = i + text.length;
+           while (i < textEnd) {
+             mainChars[i].shadowIndex = shadowI;
+             i++; shadowI++;
+           }
+         } else if (kind === -1) {
+           let textEnd = i + text.length;
+           while (i < textEnd) {
+             i++;
+           }
+           
+         } else if (kind === 1) {
+           const createChars = [];
+           let textEnd = shadowI + text.length;
+           while (shadowI < textEnd) {
+             createChars.push({...shadowChars[shadowI]})
+             shadowI++;
+           }
+           createCharRuns.push(createChars);
          }
-       } else if (kind === -1) {
-         let textEnd = i + text.length;
-         while (i < textEnd) {
-           i++;
-         }
-         
-       } else if (kind === 1) {
-         const createChars = [];
-         let textEnd = shadowI + text.length;
-         while (shadowI < textEnd) {
-           createChars.push({...shadowChars[shadowI]})
-           shadowI++;
-         }
-         createCharRuns.push(createChars);
        }
-     }
+       return createCharRuns;
+     })();
+
+     canvas.onmousemove = function(e) {
+       const charIdx = Renderer.charIndexUnder(e.offsetX, e.offsetY);
+       const char = mainChars[charIdx];
+       if (!char) { document.body.style.cursor = 'auto'; return; }
+
+       document.body.style.cursor = 'pointer';
+     };
+     canvas.onmousedown = function(e) { Animator.target = 1; Animator.step = 0.1; };
+     canvas.onmouseup = function(e) { Animator.target = 0; Animator.step = 0.01; };
+     document.onkeydown = document.onkeyup = function(e) { Animator.slowMode = e.shiftKey; }
     </script>
   </body>
 </html>
