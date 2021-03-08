@@ -10,7 +10,7 @@
   </head>
 
   <body>
-    <canvas width="800" height="1000" id="canv"></canvas>
+    <canvas width="2000" height="2000" id="canv"></canvas>
 
     <script>
      let obj = {
@@ -63,6 +63,7 @@
        ctx.textBaseline = 'top';
        ctx.font = '1em Operator Mono SSm, monospace';
        const metrics = ctx.measureText('m');
+       console.log(metrics);
 
        function computePositions(chars) {
          let {x, y} = chars[0];
@@ -70,7 +71,7 @@
            char.x = x; char.y = y;
            if (char.c === '\n' || char.x > 700) {
              x = 0;
-             y += metrics.emHeightDescent;
+             y += metrics.fontBoundingBoxDescent + 1;
            } else {
              x += metrics.width;
            }
@@ -83,12 +84,12 @@
            for (let [i, char] of mainChars.entries()) {
              if (char.x < x && char.y < y &&
                  x < char.x + metrics.width &&
-                 y < char.y + metrics.emHeightDescent) {
+                 y < char.y + metrics.fontBoundingBoxDescent + 1) {
                return i;
              }
            }
          },
-         clear() { ctx.clearRect(0, 0, 1000, 1000); },
+         clear() { ctx.clearRect(0, 0, 1000, 500); },
          render(chars, startIdx = 0, endIdx = chars.length - 1) {
            for (let i = startIdx; i <= endIdx; i++) {
              const char = chars[i];
@@ -134,23 +135,20 @@
          };
        })();
        
-       let target, step, slowMode;
+       let target = 0, rate, slowMode;
 
        let t = 0;
-       requestAnimationFrame(function frame(prevTimestamp, timestamp) {
-         // FIXME: make step timediff-dependent (?) it's a bit too fast atm
-         if (target < t) {
-           t -= slowMode ? step/2 : step;
-           if (t < target) t = target;
+       requestAnimationFrame(timestamp => {
+         (function frame(prevTimestamp, timestamp) {
+           if (Math.abs(target - t) > 0.1) {
+             t += (target - t) / (timestamp - prevTimestamp) * rate;
+             renderFrame(t);
+           } else {
+             // FIXME: stop animation
+           }
 
-         } else if (target > t) {
-           t += slowMode ? step/2 : step;
-           if (t > target) t = target;
-         }
-
-         renderFrame(t);
-
-         requestAnimationFrame(newTimestamp => frame(timestamp, newTimestamp));
+           requestAnimationFrame(newTimestamp => frame(timestamp, newTimestamp));
+         })(timestamp - 20, timestamp)
        });
 
        return {
@@ -159,8 +157,8 @@
            target = t;
            // FIXME: dynamically stop/start animation
          },
-         get step() { return step; },
-         set step(s) { step = s; },
+         get rate() { return rate; },
+         set rate(s) { rate = s; },
          get slowMode() { return slowMode; },
          set slowMode(sm) { slowMode = sm; }
        };
@@ -216,8 +214,8 @@
 
        document.body.style.cursor = 'pointer';
      };
-     canvas.onmousedown = function(e) { Animator.target = 1; Animator.step = 0.1; };
-     canvas.onmouseup = function(e) { Animator.target = 0; Animator.step = 0.01; };
+     canvas.onmousedown = canvas.ontouchstart = function(e) { Animator.target = 1; Animator.rate = 1; };
+     canvas.onmouseup = canvas.ontouchend = function(e) { Animator.target = 0; Animator.rate = 2; };
      document.onkeydown = document.onkeyup = function(e) { Animator.slowMode = e.shiftKey; }
     </script>
   </body>
