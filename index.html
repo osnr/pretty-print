@@ -4,14 +4,14 @@
 
     <style>
      #canv { position: absolute; left: 0; top: 0; }
- 
+     
      body { margin: 0; overflow: hidden; }
+
+     * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
     </style>
   </head>
 
   <body>
-    <canvas width="1000" height="600" id="canv"></canvas>
-
     <script>
      let obj = {
        "manifest_version": 2,
@@ -37,186 +37,197 @@
          }
        }
      };
-     // source text (what shows up on the screen initially)
-     let mainText = JSON.stringify(obj);
-     // target text (what the source text animates into when you mousedown)
-     let shadowText = JSON.stringify(obj, null, 2);
+     make();
 
-     const canvas = document.querySelector('canvas');
+     function make(mainText = JSON.stringify(obj),
+                   shadowText = JSON.stringify(obj, null, 2)) {
+       // mainText: source text (what shows up on the screen initially)
+       // shadowText: target text (what the source text animates into when you mousedown)
 
-     const Renderer = (function() {
-       function setDPI(canvas, dpi) {
-         // Set up CSS size.
-         canvas.style.width = canvas.style.width || canvas.width + 'px';
-         canvas.style.height = canvas.style.height || canvas.height + 'px';
+       const mainChars = mainText.split('').map(c => ({c, x: 0, y: 0}));
+       const shadowChars = shadowText.split('').map(c => ({c, x: 0, y: 0}));
+       
+       const diffs = (function() {
+         const differ = new diff_match_patch();
+         const diffs = differ.diff_main(mainText, shadowText);
+         // cleanupSemantic tries to chunk together diffs -- may be
+         // better if you don't want to have individual characters
+         // reused, for instance:
+         // differ.diff_cleanupSemantic(diffs);
+         return diffs;
+       })();
 
-         // Resize canvas and scale future draws.
-         var scaleFactor = dpi / 96;
-         canvas.width = Math.ceil(canvas.width * scaleFactor);
-         canvas.height = Math.ceil(canvas.height * scaleFactor);
-         var ctx = canvas.getContext('2d');
-         ctx.scale(scaleFactor, scaleFactor);
-       }
-       setDPI(canvas, 192);
+       const canvas = (function() {
+         try { document.getElementById('canv').remove(); } catch (e) {}
+         document.body.insertAdjacentHTML('beforeend', `<canvas width="1000" height="600" id="canv"></canvas>`);
+         return document.getElementById('canv');
+       })();
 
-       const ctx = canvas.getContext('2d');
-       ctx.textBaseline = 'top';
-       ctx.font = '1em Operator Mono SSm, monospace';
-       const metrics = ctx.measureText('m');
-       console.log(metrics);
+       const Renderer = (function() {
+         function setDPI(canvas, dpi) {
+           // Set up CSS size.
+           canvas.style.width = canvas.style.width || canvas.width + 'px';
+           canvas.style.height = canvas.style.height || canvas.height + 'px';
 
-       function computePositions(chars) {
-         let {x, y} = chars[0];
-         for (let char of chars) {
-           char.x = x; char.y = y;
-           if (char.c === '\n' || char.x > 700) {
-             x = 0;
-             y += metrics.fontBoundingBoxDescent + 1;
-           } else {
-             x += metrics.width;
-           }
+           // Resize canvas and scale future draws.
+           var scaleFactor = dpi / 96;
+           canvas.width = Math.ceil(canvas.width * scaleFactor);
+           canvas.height = Math.ceil(canvas.height * scaleFactor);
+           var ctx = canvas.getContext('2d');
+           ctx.scale(scaleFactor, scaleFactor);
          }
-       }
+         setDPI(canvas, 192);
 
-       return {
-         computePositions,
-         charIndexUnder(x, y) {
-           for (let [i, char] of mainChars.entries()) {
-             if (char.x < x && char.y < y &&
-                 x < char.x + metrics.width &&
-                 y < char.y + metrics.fontBoundingBoxDescent + 1) {
-               return i;
+         const ctx = canvas.getContext('2d');
+         ctx.textBaseline = 'top';
+         ctx.font = '1em Operator Mono SSm, monospace';
+         const metrics = ctx.measureText('m');
+
+         return {
+           computePositions(chars) {
+             let {x, y} = chars[0];
+             for (let char of chars) {
+               char.x = x; char.y = y;
+               if (char.c === '\n' || char.x > 700) {
+                 x = 0;
+                 y += metrics.fontBoundingBoxDescent + 1;
+               } else {
+                 x += metrics.width;
+               }
              }
-           }
-         },
-         clear() { ctx.clearRect(0, 0, 1000, 600); },
-         render(chars, startIdx = 0, endIdx = chars.length - 1) {
-           for (let i = startIdx; i <= endIdx; i++) {
-             const char = chars[i];
-             ctx.fillText(char.c,
-                          'animX' in char ? char.animX : char.x,
-                          'animY' in char ? char.animY : char.y);
-           }
-         },
-         ctx
-       };
-     })();
-
-     const Animator = (function() {
-       const renderFrame = (function() {
-         function easeInOutCubic(x) {
-           return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-         }
-
-         function animate(x0, x1, t, ease = easeInOutCubic) {
-           return x0 * (1 - ease(t)) + x1 * ease(t);
-         }
-
-         return function frame(t) {
-           for (let char of mainChars) {
-             if ('shadowIndex' in char) {
-               const shadowChar = shadowChars[char.shadowIndex];
-               char.animX = animate(char.x, shadowChar.x, t);
-               char.animY = animate(char.y, shadowChar.y, t);
-             } else {
-               char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0, t)})`;
+           },
+           charIndexUnder(x, y) {
+             for (let [i, char] of mainChars.entries()) {
+               if (char.x < x && char.y < y &&
+                   x < char.x + metrics.width &&
+                   y < char.y + metrics.fontBoundingBoxDescent + 1) {
+                 return i;
+               }
              }
-           }
-
-           Renderer.clear();
-           Renderer.render(mainChars);
-
-           for (let createChars of createCharRuns) {
-             createChars.forEach(char => {
-               char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1, t)})`;
-             });
-             Renderer.render(createChars);
-           }
+           },
+           clear() { ctx.clearRect(0, 0, 1000, 600); },
+           render(chars, startIdx = 0, endIdx = chars.length - 1) {
+             for (let i = startIdx; i <= endIdx; i++) {
+               const char = chars[i];
+               ctx.fillStyle = char.fillStyle || 'black';
+               ctx.fillText(char.c,
+                            'animX' in char ? char.animX : char.x,
+                            'animY' in char ? char.animY : char.y);
+             }
+           },
+           ctx
          };
        })();
-       
-       let target = 0, rate, slowMode;
 
-       let t = 0;
-       requestAnimationFrame(timestamp => {
-         (function frame(prevTimestamp, timestamp) {
-           if (Math.abs(target - t) > 0.01) {
-             t += (target - t) / (timestamp - prevTimestamp) * rate;
-             renderFrame(t);
-           } else {
-             // FIXME: stop animation
+       const Animator = (function() {
+         const renderFrame = (function() {
+           function easeInOutCubic(x) {
+             return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
            }
 
-           requestAnimationFrame(newTimestamp => frame(timestamp, newTimestamp));
-         })(timestamp - 20, timestamp)
-       });
+           function animate(x0, x1, t, ease = easeInOutCubic) {
+             return x0 * (1 - ease(t)) + x1 * ease(t);
+           }
 
-       return {
-         get target() { return target; },
-         set target(t) {
-           target = t;
-           // FIXME: dynamically stop/start animation
-         },
-         get rate() { return rate; },
-         set rate(s) { rate = s; },
-         get slowMode() { return slowMode; },
-         set slowMode(sm) { slowMode = sm; }
-       };
-     })();
+           return function renderFrame(t) {
+             for (let char of mainChars) {
+               if ('shadowIndex' in char) {
+                 const shadowChar = shadowChars[char.shadowIndex];
+                 char.animX = animate(char.x, shadowChar.x, t);
+                 char.animY = animate(char.y, shadowChar.y, t);
+               } else {
+                 char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0, t)})`;
+               }
+             }
 
-     const mainChars = mainText.split('').map(c => ({c, x: 0, y: 0}));
-     Renderer.computePositions(mainChars);
-     Renderer.render(mainChars);
+             Renderer.clear();
+             Renderer.render(mainChars);
 
-     const shadowChars = shadowText.split('').map(c => ({c, x: 0, y: 0}));
-     Renderer.computePositions(shadowChars);
+             for (let createChars of createCharRuns) {
+               createChars.forEach(char => {
+                 char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1, t)})`;
+               });
+               Renderer.render(createChars);
+             }
+           };
+         })();
+         
+         let target = 0, rate, slowMode;
 
-     const diffs = (function() {
-       const differ = new diff_match_patch();
-       const diffs = differ.diff_main(mainText, shadowText);
-       // differ.diff_cleanupSemantic(diffs);
-       return diffs;
-     })();
+         let t = 0;
+         requestAnimationFrame(timestamp => {
+           (function frame(prevTimestamp, timestamp) {
+             if (Math.abs(target - t) > 0.01) {
+               t += (target - t) / (timestamp - prevTimestamp) * rate;
+               renderFrame(t);
+             } else {
+               // FIXME: stop animation
+             }
 
-     const createCharRuns = (function() {
+             requestAnimationFrame(newTimestamp => frame(timestamp, newTimestamp));
+           })(timestamp - 20, timestamp)
+         });
+
+         return {
+           get target() { return target; },
+           set target(t) {
+             target = t;
+             // FIXME: dynamically restart animation once we're stopping it above
+           },
+           get rate() { return rate; },
+           set rate(s) { rate = s; },
+           get slowMode() { return slowMode; },
+           set slowMode(sm) { slowMode = sm; }
+         };
+       })();
+
+       Renderer.computePositions(mainChars);
+       Renderer.render(mainChars);
+
+       Renderer.computePositions(shadowChars);
+
+       // creation of createCharRuns requires that shadowChars have positions computed already.
        const createCharRuns = [];
-       let i = 0, shadowI = 0;
-       for (let {0: kind, 1: text} of diffs) {
-         if (kind === 0) {
-           let textEnd = i + text.length;
-           while (i < textEnd) {
-             mainChars[i].shadowIndex = shadowI;
-             i++; shadowI++;
+       (function() { // walk the diffs to construct a mapping mainChars -> shadowChars
+         let i = 0, shadowI = 0;
+         for (let {0: kind, 1: text} of diffs) {
+           if (kind === 0) { // this run of mainText is preserved in shadowText
+             let textEnd = i + text.length;
+             while (i < textEnd) {
+               mainChars[i].shadowIndex = shadowI;
+               i++; shadowI++;
+             }
+
+           } else if (kind === -1) { // this run of mainText is removed in shadowText
+             let textEnd = i + text.length;
+             while (i < textEnd) {
+               i++;
+             }
+
+           } else if (kind === 1) { // this run is _created_ in shadowText
+             const createChars = [];
+             let textEnd = shadowI + text.length;
+             while (shadowI < textEnd) {
+               // uses (depends on) computed position from shadowChar
+               createChars.push({...shadowChars[shadowI]})
+               shadowI++;
+             }
+             createCharRuns.push(createChars);
            }
-         } else if (kind === -1) {
-           let textEnd = i + text.length;
-           while (i < textEnd) {
-             i++;
-           }
-           
-         } else if (kind === 1) {
-           const createChars = [];
-           let textEnd = shadowI + text.length;
-           while (shadowI < textEnd) {
-             createChars.push({...shadowChars[shadowI]})
-             shadowI++;
-           }
-           createCharRuns.push(createChars);
          }
-       }
-       return createCharRuns;
-     })();
+       })();
 
-     canvas.onmousemove = function(e) {
-       const charIdx = Renderer.charIndexUnder(e.offsetX, e.offsetY);
-       const char = mainChars[charIdx];
-       if (!char) { document.body.style.cursor = 'auto'; return; }
+       canvas.onmousemove = function(e) {
+         const charIdx = Renderer.charIndexUnder(e.offsetX, e.offsetY);
+         const char = mainChars[charIdx];
+         if (!char) { document.body.style.cursor = 'auto'; return; }
 
-       document.body.style.cursor = 'pointer';
-     };
-     canvas.onmousedown = canvas.ontouchstart = function(e) { Animator.target = 1; Animator.rate = 1; };
-     canvas.onmouseup = canvas.ontouchend = function(e) { Animator.target = 0; Animator.rate = 2; };
-     document.onkeydown = document.onkeyup = function(e) { Animator.slowMode = e.shiftKey; }
+         document.body.style.cursor = 'pointer';
+       };
+       canvas.onmousedown = canvas.ontouchstart = function(e) { Animator.target = 1; Animator.rate = 1; };
+       canvas.onmouseup = canvas.ontouchend = function(e) { Animator.target = 0; Animator.rate = 2; };
+       document.onkeydown = document.onkeyup = function(e) { Animator.slowMode = e.shiftKey; }
+     }
     </script>
   </body>
 </html>
