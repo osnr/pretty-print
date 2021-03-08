@@ -164,7 +164,7 @@
        requestAnimationFrame(timestamp => {
          (function frame(prevTimestamp, timestamp) {
            if (Math.abs(target - t) > 0.01) {
-             t += (target - t) / (timestamp - prevTimestamp) * rate;
+             t += (target - t) / (timestamp - prevTimestamp) * (slowMode ? (rate / 4) : rate);
              renderFrame(t);
            } else {
              // FIXME: stop animation
