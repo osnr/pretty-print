@@ -2,6 +2,9 @@
   <head>
     <meta charset="utf-8"/>
 
+    <!-- You can replace this script tag with
+           <script src="https://omar.website/pretty-print/vendor/diff_match_patch.js"></script>
+         if you're trying to edit and run this page locally. -->
     <script src="vendor/diff_match_patch.js"></script>
 
     <style>
@@ -9,12 +12,19 @@
      body { margin: 0; overflow-x: hidden; }
      *:not(textarea) { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 
-     #details { position: absolute; right: 0; top: 0; }
+     #details {
+         position: absolute; right: 0; top: 0; padding: 1em 1em;
+         z-index: 1;
+         font: 14px Verdana, sans-serif;
+         background: rgba(255, 192, 192, 0.87);
+         max-width: 600px;
+     }
      #details textarea {
          width: 600px; height: 300px;
          word-break: break-all;
-         font: 1em Operator Mono SSm, monospace;
+         font: 16px Operator Mono SSm, monospace;
          line-height: 140%;
+         background: #eee;
      }
     </style>
   </head>
@@ -23,21 +33,35 @@
     <details id="details">
       <summary>?</summary>
 
-      <p>You can view the source. It's not that complicated!</p>
+      <p><a href="https://twitter.com/rsnous/status/1367305117293178881">pretty print</a></p>
 
-      <p>Start with text:</p>
-      <textarea id="main"></textarea>
-      <p>Animate into text:</p>
-      <textarea id="shadow"></textarea>
+      <p>
+        Start with text:<br>
+        <textarea id="main"></textarea>
+      </p>
+      <p>
+        Animate into text:<br>
+        <textarea id="shadow"></textarea>
+      </p>
+
+      <p>
+        <input type="checkbox" id="prefer-words" name="prefer-words">
+        <label for="prefer-words"> <a href="https://github.com/google/diff-match-patch/wiki/API#diff_cleanupsemanticdiffs--null">Clean up</a> diff (will generally prefer to track whole words instead of characters)</label>
+      </p>
+
+      <p>You should look at the source for this page! (and maybe save
+      it to disk and mess around with it.) I hope it's not that
+      complicated.</p>
     </details>
     
     <script>
-     const [main, shadow] = [document.getElementById('main'),
-                             document.getElementById('shadow')];
+     const [main, shadow, preferWords] = [document.getElementById('main'),
+                                          document.getElementById('shadow'),
+                                          document.getElementById('prefer-words')];
      function remake() {
-       make(main.value, shadow.value);
+       make(main.value, shadow.value, preferWords.checked);
      };
-     main.oninput = shadow.oninput = remake;
+     main.oninput = shadow.oninput = preferWords.oninput = remake;
 
      const details = document.getElementById('details');
      details.open = localStorage.getItem('details.open') === 'true';
@@ -76,15 +100,22 @@
      function make(mainText, shadowText, cleanupSemantic = false) {
        // mainText: source text (what shows up on the screen initially)
        // shadowText: target text (what the source text animates into when you mousedown)
+
        const mainChars = mainText.split('').map(c => ({c, x: 0, y: 0}));
        const shadowChars = shadowText.split('').map(c => ({c, x: 0, y: 0}));
+
+       // it really bothers me that all these rich variables and
+       // intermediate data structures I'm creating here -- that a
+       // programmer-user might want to look at and mess with -- are
+       // _trapped_ inside this lexical scope, inaccessible from the REPL.
+       // you can't get at them!! https://twitter.com/rsnous/status/1340353349992902657
        
        const diffs = (function() {
          const differ = new diff_match_patch();
          const diffs = differ.diff_main(mainText, shadowText);
          // cleanupSemantic tries to chunk together diffs -- may be
          // better if you don't want to have individual characters
-         // reused, for instance:
+         // reused, for instance, just whole words:
          if (cleanupSemantic) { differ.diff_cleanupSemantic(diffs); }
          // (it doesn't work great for pretty-print example)
          return diffs;
@@ -113,7 +144,7 @@
 
          const ctx = canvas.getContext('2d');
          ctx.textBaseline = 'top';
-         ctx.font = '1em Operator Mono SSm, monospace';
+         ctx.font = '16px Operator Mono SSm, monospace';
          const metrics = ctx.measureText('m');
          const lineHeight = metrics.actualBoundingBoxDescent * 1.4;
 
