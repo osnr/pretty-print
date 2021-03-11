@@ -6,13 +6,45 @@
 
     <style>
      #canv { position: absolute; left: 0; top: 0; }
-     body { margin: 0; overflow: hidden; }
-     * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+     body { margin: 0; overflow-x: hidden; }
+     *:not(textarea) { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+
+     #details { position: absolute; right: 0; top: 0; }
+     #details textarea {
+         width: 600px; height: 300px;
+         word-break: break-all;
+         font: 1em Operator Mono SSm, monospace;
+         line-height: 140%;
+     }
     </style>
   </head>
 
   <body>
+    <details id="details">
+      <summary>?</summary>
+
+      <p>You can view the source. It's not that complicated!</p>
+
+      <p>Start with text:</p>
+      <textarea id="main"></textarea>
+      <p>Animate into text:</p>
+      <textarea id="shadow"></textarea>
+    </details>
+    
     <script>
+     const [main, shadow] = [document.getElementById('main'),
+                             document.getElementById('shadow')];
+     function remake() {
+       make(main.value, shadow.value);
+     };
+     main.oninput = shadow.oninput = remake;
+
+     const details = document.getElementById('details');
+     details.open = localStorage.getItem('details.open') === 'true';
+     details.ontoggle = () => {
+       localStorage.setItem('details.open', String(details.open));
+     };
+
      const obj = {
        "manifest_version": 2,
 
@@ -37,203 +69,206 @@
          }
        }
      };
+     main.value = JSON.stringify(obj);
+     shadow.value = JSON.stringify(obj, null, 2);
+     remake();
 
-     // mainText: source text (what shows up on the screen initially)
-     // shadowText: target text (what the source text animates into when you mousedown)
-     const mainText = JSON.stringify(obj);
-     const shadowText = JSON.stringify(obj, null, 2);
+     function make(mainText, shadowText, cleanupSemantic = false) {
+       // mainText: source text (what shows up on the screen initially)
+       // shadowText: target text (what the source text animates into when you mousedown)
+       const mainChars = mainText.split('').map(c => ({c, x: 0, y: 0}));
+       const shadowChars = shadowText.split('').map(c => ({c, x: 0, y: 0}));
+       
+       const diffs = (function() {
+         const differ = new diff_match_patch();
+         const diffs = differ.diff_main(mainText, shadowText);
+         // cleanupSemantic tries to chunk together diffs -- may be
+         // better if you don't want to have individual characters
+         // reused, for instance:
+         if (cleanupSemantic) { differ.diff_cleanupSemantic(diffs); }
+         // (it doesn't work great for pretty-print example)
+         return diffs;
+       })();
 
-     const mainChars = mainText.split('').map(c => ({c, x: 0, y: 0}));
-     const shadowChars = shadowText.split('').map(c => ({c, x: 0, y: 0}));
-     
-     const diffs = (function() {
-       const differ = new diff_match_patch();
-       const diffs = differ.diff_main(mainText, shadowText);
-       // cleanupSemantic tries to chunk together diffs -- may be
-       // better if you don't want to have individual characters
-       // reused, for instance:
-       // differ.diff_cleanupSemantic(diffs);
-       return diffs;
-     })();
+       const canvas = (function() {
+         try { document.getElementById('canv').remove(); } catch (e) {}
+         document.body.insertAdjacentHTML('afterbegin', `<canvas width="1000" height="600" id="canv"></canvas>`);
+         return document.getElementById('canv');
+       })();
 
-     const canvas = (function() {
-       try { document.getElementById('canv').remove(); } catch (e) {}
-       document.body.insertAdjacentHTML('beforeend', `<canvas width="1000" height="600" id="canv"></canvas>`);
-       return document.getElementById('canv');
-     })();
+       const Renderer = (function() {
+         function setDPI(canvas, dpi) {
+           // Set up CSS size.
+           canvas.style.width = canvas.style.width || canvas.width + 'px';
+           canvas.style.height = canvas.style.height || canvas.height + 'px';
 
-     const Renderer = (function() {
-       function setDPI(canvas, dpi) {
-         // Set up CSS size.
-         canvas.style.width = canvas.style.width || canvas.width + 'px';
-         canvas.style.height = canvas.style.height || canvas.height + 'px';
-
-         // Resize canvas and scale future draws.
-         var scaleFactor = dpi / 96;
-         canvas.width = Math.ceil(canvas.width * scaleFactor);
-         canvas.height = Math.ceil(canvas.height * scaleFactor);
-         var ctx = canvas.getContext('2d');
-         ctx.scale(scaleFactor, scaleFactor);
-       }
-       setDPI(canvas, 192);
-
-       const ctx = canvas.getContext('2d');
-       ctx.textBaseline = 'top';
-       ctx.font = '1em Operator Mono SSm, monospace';
-       const metrics = ctx.measureText('m');
-       const lineHeight = metrics.actualBoundingBoxDescent * 1.4;
-
-       return {
-         computePositions(chars) {
-           let {x, y} = chars[0];
-           for (let char of chars) {
-             char.x = x; char.y = y;
-             if (char.c === '\n' || char.x > 700) {
-               x = 0;
-               y += lineHeight;
-             } else {
-               x += metrics.width;
-             }
-           }
-         },
-         charIndexUnder(x, y) {
-           for (let [i, char] of mainChars.entries()) {
-             if (char.x < x && char.y < y &&
-                 x < char.x + metrics.width &&
-                 y < char.y + lineHeight) {
-               return i;
-             }
-           }
-         },
-         clear() { ctx.clearRect(0, 0, 1000, 600); },
-         render(chars, startIdx = 0, endIdx = chars.length - 1) {
-           for (let i = startIdx; i <= endIdx; i++) {
-             const char = chars[i];
-             const x = "animX" in char ? char.animX : char.x;
-             const y = "animY" in char ? char.animY : char.y;
-             if (char.bgStyle) {
-               ctx.save();
-               ctx.fillStyle = char.bgStyle;
-               ctx.fillRect(x, y, metrics.width, lineHeight);
-               ctx.restore();
-             }
-             ctx.fillStyle = char.fillStyle || 'black';
-             ctx.fillText(char.c, x, y);
-           }
-         },
-         ctx
-       };
-     })();
-
-     const Animator = (function() {
-       const renderFrame = (function() {
-         function easeInOutCubic(x) {
-           return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+           // Resize canvas and scale future draws.
+           var scaleFactor = dpi / 96;
+           canvas.width = Math.ceil(canvas.width * scaleFactor);
+           canvas.height = Math.ceil(canvas.height * scaleFactor);
+           var ctx = canvas.getContext('2d');
+           ctx.scale(scaleFactor, scaleFactor);
          }
+         setDPI(canvas, 192);
 
-         function animate(x0, x1, t, ease = easeInOutCubic) {
-           return x0 * (1 - ease(t)) + x1 * ease(t);
-         }
+         const ctx = canvas.getContext('2d');
+         ctx.textBaseline = 'top';
+         ctx.font = '1em Operator Mono SSm, monospace';
+         const metrics = ctx.measureText('m');
+         const lineHeight = metrics.actualBoundingBoxDescent * 1.4;
 
-         return function renderFrame(t) {
-           for (let char of mainChars) {
-             if ('shadowIndex' in char) {
-               const shadowChar = shadowChars[char.shadowIndex];
-               char.animX = animate(char.x, shadowChar.x, t);
-               char.animY = animate(char.y, shadowChar.y, t);
-             } else {
-               char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0, t)})`;
+         return {
+           computePositions(chars) {
+             let {x, y} = chars[0];
+             for (let char of chars) {
+               char.x = x; char.y = y;
+               if (char.c === '\n' || char.x > 570) {
+                 x = 0;
+                 y += lineHeight;
+               } else {
+                 x += metrics.width;
+               }
              }
-           }
-
-           Renderer.clear();
-           Renderer.render(mainChars);
-
-           for (let createChars of createCharRuns) {
-             createChars.forEach(char => {
-               char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1, t)})`;
-             });
-             Renderer.render(createChars);
-           }
+           },
+           charIndexUnder(x, y) {
+             for (let [i, char] of mainChars.entries()) {
+               if (char.x < x && char.y < y &&
+                   x < char.x + metrics.width &&
+                   y < char.y + lineHeight) {
+                 return i;
+               }
+             }
+           },
+           clear() { ctx.clearRect(0, 0, 1000, 600); },
+           render(chars, startIdx = 0, endIdx = chars.length - 1) {
+             for (let i = startIdx; i <= endIdx; i++) {
+               const char = chars[i];
+               const x = "animX" in char ? char.animX : char.x;
+               const y = "animY" in char ? char.animY : char.y;
+               if (char.bgStyle) {
+                 ctx.save();
+                 ctx.fillStyle = char.bgStyle;
+                 ctx.fillRect(x, y, metrics.width, lineHeight);
+                 ctx.restore();
+               }
+               ctx.fillStyle = char.fillStyle || 'black';
+               ctx.fillText(char.c, x, y);
+             }
+           },
+           ctx
          };
        })();
-       
-       let target = 0, rate, slowMode;
 
-       let t = 0;
-       requestAnimationFrame(timestamp => {
-         (function frame(prevTimestamp, timestamp) {
-           if (Math.abs(target - t) > 0.01) {
-             t += (target - t) / (timestamp - prevTimestamp) * (slowMode ? (rate / 4) : rate);
-             renderFrame(t);
-           } else {
-             // FIXME: stop animation
+       const Animator = (function() {
+         const renderFrame = (function() {
+           function easeInOutCubic(x) {
+             return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
            }
 
-           requestAnimationFrame(newTimestamp => frame(timestamp, newTimestamp));
-         })(timestamp - 20, timestamp)
-       });
-
-       return {
-         get target() { return target; },
-         set target(t) {
-           target = t;
-           // FIXME: dynamically restart animation once we're stopping it above
-         },
-         get rate() { return rate; },
-         set rate(s) { rate = s; },
-         get slowMode() { return slowMode; },
-         set slowMode(sm) { slowMode = sm; }
-       };
-     })();
-
-     Renderer.computePositions(mainChars);
-     Renderer.render(mainChars);
-
-     // creation of createCharRuns (later) requires that we compute
-     // positions for shadowChars beforehand.
-     Renderer.computePositions(shadowChars);
-
-     const createCharRuns = [];
-     (function() { // walk the diffs to construct a mapping mainChars -> shadowChars
-       let i = 0, shadowI = 0;
-       for (let {0: kind, 1: text} of diffs) {
-         if (kind === 0) { // this run of mainText is preserved in shadowText
-           let textEnd = i + text.length;
-           while (i < textEnd) {
-             mainChars[i].shadowIndex = shadowI;
-             i++; shadowI++;
+           function animate(x0, x1, t, ease = easeInOutCubic) {
+             return x0 * (1 - ease(t)) + x1 * ease(t);
            }
 
-         } else if (kind === -1) { // this run of mainText is removed in shadowText
-           let textEnd = i + text.length;
-           while (i < textEnd) {
-             i++;
-           }
+           return function renderFrame(t) {
+             for (let char of mainChars) {
+               if ('shadowIndex' in char) {
+                 const shadowChar = shadowChars[char.shadowIndex];
+                 char.animX = animate(char.x, shadowChar.x, t);
+                 char.animY = animate(char.y, shadowChar.y, t);
+               } else {
+                 char.fillStyle = `rgba(0, 0, 0, ${animate(1, 0, t)})`;
+               }
+             }
 
-         } else if (kind === 1) { // this run is _created_ in shadowText
-           const createChars = [];
-           let textEnd = shadowI + text.length;
-           while (shadowI < textEnd) {
-             // uses (depends on) computed position from shadowChar
-             createChars.push({...shadowChars[shadowI]})
-             shadowI++;
+             Renderer.clear();
+             Renderer.render(mainChars);
+
+             for (let createChars of createCharRuns) {
+               createChars.forEach(char => {
+                 char.fillStyle = `rgba(0, 0, 0, ${animate(0, 1, t)})`;
+               });
+               Renderer.render(createChars);
+             }
+           };
+         })();
+         
+         let target = 0, rate, slowMode;
+
+         let t = 0;
+         requestAnimationFrame(timestamp => {
+           (function frame(prevTimestamp, timestamp) {
+             if (Math.abs(target - t) > 0.01) {
+               t += (target - t) / (timestamp - prevTimestamp) * (slowMode ? (rate / 4) : rate);
+               renderFrame(t);
+             } else {
+               // FIXME: stop animation
+             }
+
+             requestAnimationFrame(newTimestamp => frame(timestamp, newTimestamp));
+           })(timestamp - 20, timestamp)
+         });
+
+         return {
+           get target() { return target; },
+           set target(t) {
+             target = t;
+             // FIXME: dynamically restart animation once we're stopping it above
+           },
+           get rate() { return rate; },
+           set rate(s) { rate = s; },
+           get slowMode() { return slowMode; },
+           set slowMode(sm) { slowMode = sm; }
+         };
+       })();
+
+       Renderer.computePositions(mainChars);
+       Renderer.render(mainChars);
+
+       // creation of createCharRuns (later) requires that we compute
+       // positions for shadowChars beforehand.
+       Renderer.computePositions(shadowChars);
+
+       const createCharRuns = [];
+       (function() { // walk the diffs to construct a mapping mainChars -> shadowChars
+         let i = 0, shadowI = 0;
+         for (let {0: kind, 1: text} of diffs) {
+           if (kind === 0) { // this run of mainText is preserved in shadowText
+             let textEnd = i + text.length;
+             while (i < textEnd) {
+               mainChars[i].shadowIndex = shadowI;
+               i++; shadowI++;
+             }
+
+           } else if (kind === -1) { // this run of mainText is removed in shadowText
+             let textEnd = i + text.length;
+             while (i < textEnd) {
+               i++;
+             }
+
+           } else if (kind === 1) { // this run is _created_ in shadowText
+             const createChars = [];
+             let textEnd = shadowI + text.length;
+             while (shadowI < textEnd) {
+               // uses (depends on) computed position from shadowChar
+               createChars.push({...shadowChars[shadowI]})
+               shadowI++;
+             }
+             createCharRuns.push(createChars);
            }
-           createCharRuns.push(createChars);
          }
-       }
-     })();
+       })();
 
-     canvas.onmousemove = function(e) {
-       const charIdx = Renderer.charIndexUnder(e.offsetX, e.offsetY);
-       const char = mainChars[charIdx];
-       if (!char) { document.body.style.cursor = 'auto'; return; }
+       canvas.onmousemove = function(e) {
+         const charIdx = Renderer.charIndexUnder(e.offsetX, e.offsetY);
+         const char = mainChars[charIdx];
+         if (!char) { document.body.style.cursor = 'auto'; return; }
 
-       document.body.style.cursor = 'pointer';
-     };
-     canvas.onmousedown = canvas.ontouchstart = function(e) { Animator.target = 1; Animator.rate = 1; };
-     canvas.onmouseup = canvas.ontouchend = function(e) { Animator.target = 0; Animator.rate = 2; };
-     document.onkeydown = document.onkeyup = function(e) { Animator.slowMode = e.shiftKey; }
+         document.body.style.cursor = 'pointer';
+       };
+       canvas.onmousedown = canvas.ontouchstart = function(e) { Animator.target = 1; Animator.rate = 1; };
+       canvas.onmouseup = canvas.ontouchend = function(e) { Animator.target = 0; Animator.rate = 2; };
+       document.onkeydown = document.onkeyup = function(e) { Animator.slowMode = e.shiftKey; return true; }
+     }
     </script>
   </body>
 </html>
