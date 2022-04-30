@@ -65,6 +65,8 @@
      const mainText = JSON.stringify(obj);
      const shadowText = JSON.stringify(obj, null, 2);
 
+     const pointerScale = 4;
+
      const mainChars = mainText.split('').map(c => ({c, x: 0, y: 0}));
      const shadowChars = shadowText.split('').map(c => ({c, x: 0, y: 0}));
      
@@ -254,7 +256,7 @@
      const warpPointer = new Warp(pointer);
      warpPointer.interpolate(4);
      warpPointer.transform(([ x, y ]) => {
-       return [ x, y, x, y ];
+       return [ (x-10)*pointerScale, (y-10)*pointerScale, (x-10)*pointerScale, (y-10)*pointerScale ];
      });
      function rewarpPointer() {
        warpPointer.transform(([ x, y, ox, oy ]) => {
