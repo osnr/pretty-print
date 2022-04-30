@@ -61,7 +61,7 @@
      };
 
      // mainText: source text (what shows up on the screen initially)
-     // shadowText: target text (what the source text animates into when you mousedown)
+     // shadowText: target text (what the source text animates into when you pointerdown)
      const mainText = JSON.stringify(obj);
      const shadowText = JSON.stringify(obj, null, 2);
 
@@ -168,14 +168,7 @@
              }
            }
 
-           warpPointer.transform(([ x, y, ox, oy ]) => {
-             const idx = Renderer.charIndexUnder(pointerX + ox, pointerY + oy);
-             const char = mainChars[idx];
-             if (!char) return [x, y, ox, oy];
-             const animX = ('animX' in char ? char.animX : char.x);
-             const animY = ('animY' in char ? char.animY : char.y);
-             return [ox + (animX - char.x), oy + (animY - char.y), ox, oy];
-           });
+           rewarpPointer();
 
            Renderer.clear();
            Renderer.render(mainChars);
@@ -263,17 +256,7 @@
      warpPointer.transform(([ x, y ]) => {
        return [ x, y, x, y ];
      });
-
-     canvas.onmousemove = function(e) {
-       pointerX = e.offsetX; pointerY = e.offsetY;
-       pointerPointer.style.transform = `translate(${pointerX}px, ${pointerY}px)`;
-
-       const charIdx = Renderer.charIndexUnder(pointerX, pointerY);
-       const char = mainChars[charIdx];
-       if (!char) { document.body.style.cursor = 'auto'; return; }
-
-       document.body.style.cursor = 'pointer';
-
+     function rewarpPointer() {
        warpPointer.transform(([ x, y, ox, oy ]) => {
          const idx = Renderer.charIndexUnder(pointerX + ox, pointerY + oy);
          const char = mainChars[idx];
@@ -282,9 +265,21 @@
          const animY = ('animY' in char ? char.animY : char.y);
          return [ox + (animX - char.x), oy + (animY - char.y), ox, oy];
        });
+     }
+
+     canvas.onpointermove = function(e) {
+       pointerX = e.offsetX; pointerY = e.offsetY;
+       pointerPointer.style.transform = `translate(${pointerX}px, ${pointerY}px)`;
+
+       const charIdx = Renderer.charIndexUnder(pointerX, pointerY);
+       const char = mainChars[charIdx];
+       if (!char) { document.body.style.cursor = 'auto'; return; }
+
+       document.body.style.cursor = 'pointer';
+       rewarpPointer();
      };
-     canvas.onmousedown = canvas.ontouchstart = function(e) { Animator.target = 1; Animator.rate = 1; };
-     canvas.onmouseup = canvas.ontouchend = function(e) { Animator.target = 0; Animator.rate = 2; };
+     canvas.onpointerdown = function(e) { Animator.target = 1; Animator.rate = 1; };
+     canvas.onpointerup = function(e) { Animator.target = 0; Animator.rate = 2; };
      document.onkeydown = document.onkeyup = function(e) { Animator.slowMode = e.shiftKey; }
     </script>
   </body>
