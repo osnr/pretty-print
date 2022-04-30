@@ -273,6 +273,15 @@
        if (!char) { document.body.style.cursor = 'auto'; return; }
 
        document.body.style.cursor = 'pointer';
+
+       warpPointer.transform(([ x, y, ox, oy ]) => {
+         const idx = Renderer.charIndexUnder(pointerX + ox, pointerY + oy);
+         const char = mainChars[idx];
+         if (!char) return [x, y, ox, oy];
+         const animX = ('animX' in char ? char.animX : char.x);
+         const animY = ('animY' in char ? char.animY : char.y);
+         return [ox + (animX - char.x), oy + (animY - char.y), ox, oy];
+       });
      };
      canvas.onmousedown = canvas.ontouchstart = function(e) { Animator.target = 1; Animator.rate = 1; };
      canvas.onmouseup = canvas.ontouchend = function(e) { Animator.target = 0; Animator.rate = 2; };
